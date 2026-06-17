@@ -1,0 +1,82 @@
+import type { AssistantApi, AssistantApiField } from "../../context/react/AssistantApiContext";
+import type { AssistantEvent, AssistantEventCallback, AssistantEventSelector } from "../../types/EventTypes";
+import type { ResourceElement } from "@assistant-ui/tap";
+import { Unsubscribe } from "../../types";
+/**
+ * Extract the API return type from an AssistantApiField
+ */
+type ExtractApiType<T> = T extends AssistantApiField<infer TApi, any> ? TApi : never;
+/**
+ * Extract the metadata type from an AssistantApiField
+ *
+ * Used in DerivedScopesInput to validate that each field's source/query types match
+ * the expected types from AssistantApi.
+ */
+type ExtractMeta<T> = T extends AssistantApiField<any, infer TMeta> ? TMeta : never;
+/**
+ * Get only the field names from AssistantApi (exclude method names)
+ */
+type AssistantApiFieldNames = {
+    [K in keyof AssistantApi]: AssistantApi[K] extends {
+        source: any;
+        query: any;
+    } ? K : never;
+}[keyof AssistantApi];
+/**
+ * Configuration for a derived scope field - infers types from the actual values provided
+ */
+export type DerivedScopeConfig<TSource extends string | null, TQuery, TApi> = {
+    source: TSource;
+    query: TQuery;
+    get: () => TApi;
+};
+/**
+ * Type for the special `on` callback function
+ */
+export type OnCallbackFn = <TEvent extends AssistantEvent>(selector: AssistantEventSelector<TEvent>, callback: AssistantEventCallback<TEvent>) => Unsubscribe;
+/**
+ * Type for the special `subscribe` callback function
+ */
+export type SubscribeCallbackFn = (listener: () => void) => Unsubscribe;
+/**
+ * Type for the special `flushSync` callback function
+ */
+export type FlushSyncCallbackFn = () => void;
+/**
+ * Type for special non-field functions in AssistantApi
+ */
+export type SpecialCallbacks = {
+    on?: OnCallbackFn;
+    subscribe?: SubscribeCallbackFn;
+    flushSync?: FlushSyncCallbackFn;
+};
+/**
+ * Type for the scopes parameter - allows both DerivedScope elements and special callbacks.
+ * Field names are restricted to valid AssistantApi field names.
+ * TypeScript validates that the source/query/get types match the expected field type.
+ */
+export type DerivedScopesInput = {
+    [K in AssistantApiFieldNames]?: ResourceElement<AssistantApiField<ExtractApiType<AssistantApi[K]>, {
+        source: ExtractMeta<AssistantApi[K]>["source"];
+        query: ExtractMeta<AssistantApi[K]>["query"];
+    }>>;
+} & SpecialCallbacks;
+/**
+ * DerivedScope resource - memoizes an AssistantApiField based on source and query.
+ * The get callback always calls the most recent version (useEffectEvent pattern).
+ * TypeScript infers TSource, TQuery, and TApi from the config object.
+ * Validation happens at the DerivedScopesInput level.
+ */
+export declare const DerivedScope: <TSource extends string | null, TQuery, TApi>(props: DerivedScopeConfig<TSource, TQuery, TApi>, options?: {
+    key?: string | number;
+} | undefined) => ResourceElement<AssistantApiField<TApi, {
+    source: TSource;
+    query: TQuery;
+}>, DerivedScopeConfig<TSource, TQuery, TApi>>;
+/**
+ * DerivedScopes resource - takes an object of DerivedScope resource elements and special callbacks,
+ * and returns a Partial<AssistantApi> with all the derived fields.
+ */
+export declare const DerivedScopes: import("@assistant-ui/tap").Resource<Partial<AssistantApi>, DerivedScopesInput>;
+export {};
+//# sourceMappingURL=derived-scopes.d.ts.map

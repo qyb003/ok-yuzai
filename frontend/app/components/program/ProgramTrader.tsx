@@ -912,7 +912,7 @@ export default function ProgramTrader() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">
-                          {(b.exchange || 'hyperliquid') === 'binance' ? t('programTrader.apiKey', 'API Key') : t('programTrader.wallets')}:
+                          {(b.exchange || 'hyperliquid') === 'hyperliquid' ? t('programTrader.wallets') : t('programTrader.apiKey', 'API Key')}:  {/* [OKX 修改] OKX/BN=API Key, HL=Wallets */}
                         </span>{' '}
                         {b.wallets.length > 0 ? b.wallets.map((w, idx) => (
                           <span key={w.address + idx} className="font-mono text-xs" title={w.address}>

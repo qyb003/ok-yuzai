@@ -534,7 +534,7 @@ function WelcomeMessage({
 
   const greeting = nickname
     ? t('hyperAi.welcomeWithName', { name: nickname, defaultValue: `你好，${nickname}！我是 Hyper AI，你的专属交易助手。` })
-    : t('hyperAi.welcomeNoName', '你好！我是 Hyper AI，Hyper Alpha Arena 的智能助手。')
+    : t('hyperAi.welcomeNoName', '你好！111我是 Hyper AI，Hyper Alpha Arena 的智能助手。')
 
   // Default suggestions for new users (follows i18n)
   const defaultSuggestions = [

@@ -55,7 +55,7 @@ HYPER_AI_TOOLS = [
                 "properties": {
                     "exchange": {
                         "type": "string",
-                        "enum": ["hyperliquid", "binance", "all"],
+                        "enum": ["hyperliquid", "binance", "okx", "all"],
                         "description": "Filter by exchange (default: all)"
                     },
                     "environment": {
@@ -107,7 +107,7 @@ HYPER_AI_TOOLS = [
                     "symbol": {"type": "string", "description": "Trading symbol (e.g., BTC, ETH)"},
                     "period": {"type": "string", "enum": ["1m", "5m", "15m", "1h", "4h", "1d"], "description": "K-line period (default: 1h)"},
                     "limit": {"type": "integer", "description": "Number of candles (default: 50, max: 200)"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (default: hyperliquid)"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (default: hyperliquid)"}
                 },
                 "required": ["symbol"]
             }
@@ -123,7 +123,7 @@ HYPER_AI_TOOLS = [
                 "properties": {
                     "symbol": {"type": "string", "description": "Trading symbol"},
                     "period": {"type": "string", "enum": ["1m", "5m", "15m", "1h", "4h", "1d"], "description": "Time period (default: 1h)"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (default: hyperliquid)"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (default: hyperliquid)"}
                 },
                 "required": ["symbol"]
             }
@@ -139,7 +139,7 @@ HYPER_AI_TOOLS = [
                 "properties": {
                     "symbol": {"type": "string", "description": "Trading symbol"},
                     "period": {"type": "string", "enum": ["1m", "5m", "15m", "1h", "4h", "1d"], "description": "Time period (default: 1h)"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (default: hyperliquid)"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (default: hyperliquid)"}
                 },
                 "required": ["symbol"]
             }
@@ -207,7 +207,7 @@ HYPER_AI_TOOLS = [
                 "properties": {
                     "exchange": {
                         "type": "string",
-                        "enum": ["hyperliquid", "binance"],
+                        "enum": ["hyperliquid", "binance", "okx"],
                         "description": "Exchange to update watchlist for"
                     },
                     "symbols": {
@@ -286,7 +286,7 @@ HYPER_AI_TOOLS = [
                     "symbol": {"type": "string", "description": "Supported trading symbol from get_strategy_radar_universe, e.g. BTC"},
                     "period": {"type": "string", "enum": ["1h", "4h", "1d"], "description": "Radar period (default: 1h)"},
                     "regime": {"type": "string", "description": "Optional requested regime. Omit to use current Radar regime for the symbol/period."},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Optional exchange filter"},
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Optional exchange filter"},
                     "strategy_type": {"type": "string", "description": "Optional strategy type filter"},
                     "sort_by": {"type": "string", "enum": ["relevance", "quality", "newest"], "description": "Optional sort mode. Default is relevance."},
                     "risk_level": {"type": "string", "enum": ["Low", "Medium", "High"], "description": "Optional risk filter."},
@@ -324,7 +324,7 @@ HYPER_AI_TOOLS = [
                         "description": "Array of signal conditions. Standard signals use metric/operator/threshold/time_window. taker_volume uses metric/direction/ratio_threshold/volume_threshold/time_window instead."
                     },
                     "logic": {"type": "string", "enum": ["AND", "OR"], "description": "Logic operator (default: AND)"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (default: hyperliquid)"},
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (default: hyperliquid)"},
                     "description": {"type": "string", "description": "Optional description for the pool"}
                 },
                 "required": ["pool_name", "symbol", "signals"]
@@ -452,7 +452,7 @@ HYPER_AI_TOOLS = [
                 "properties": {
                     "trader_id": {"type": "integer", "description": "AI Trader ID"},
                     "program_id": {"type": "integer", "description": "Trading program ID"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange to trade on (REQUIRED). Must match signal_pool exchange."},
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange to trade on (REQUIRED). Must match signal_pool exchange."},
                     "signal_pool_ids": {
                         "type": "array",
                         "items": {"type": "integer"},
@@ -474,7 +474,7 @@ HYPER_AI_TOOLS = [
                 "type": "object",
                 "properties": {
                     "trader_id": {"type": "integer", "description": "AI Trader ID"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Target exchange. MUST match the trader's wallet exchange."},
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Target exchange. MUST match the trader's wallet exchange."},
                     "signal_pool_ids": {
                         "type": "array",
                         "items": {"type": "integer"},
@@ -691,7 +691,7 @@ HYPER_AI_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (required)"},
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (required)"},
                     "symbol": {"type": "string", "description": "Trading symbol (e.g., BTC). If omitted, returns factor library list."},
                     "factor_name": {"type": "string", "description": "Specific factor name for detailed info + history"},
                     "forward_period": {"type": "string", "enum": ["1h", "4h", "12h", "24h"], "description": "Forward period for effectiveness (default: 4h)"},
@@ -711,7 +711,7 @@ HYPER_AI_TOOLS = [
                 "properties": {
                     "expression": {"type": "string", "description": "Factor expression (e.g., 'EMA(close, 7) / EMA(close, 21) - 1')"},
                     "symbol": {"type": "string", "description": "Trading symbol (e.g., BTC)"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (required)"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (required)"}
                 },
                 "required": ["expression", "symbol", "exchange"]
             }
@@ -759,7 +759,7 @@ HYPER_AI_TOOLS = [
                 "type": "object",
                 "properties": {
                     "factor_name": {"type": "string", "description": "Factor name to compute"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (required)"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (required)"}
                 },
                 "required": ["factor_name", "exchange"]
             }
@@ -889,7 +889,7 @@ HYPER_AI_TOOLS = HYPER_AI_TOOLS + EXTERNAL_TOOLS + SKILL_TOOLS + SUBAGENT_TOOLS
 def execute_get_system_overview(db: Session) -> str:
     """Get high-level system status summary."""
     from database.models import (
-        Account, HyperliquidWallet, BinanceWallet, PromptTemplate,
+        Account, HyperliquidWallet, BinanceWallet, OkxWallet, PromptTemplate,  # [OKX]
         TradingProgram, SignalPool, AccountPromptBinding, AccountProgramBinding,
         HyperliquidPosition
     )
@@ -960,7 +960,7 @@ def execute_get_system_overview(db: Session) -> str:
 
 def execute_get_wallet_status(db: Session, exchange: str = "all", environment: str = "all") -> str:
     """Get wallet balance and position summary using real-time API (same as frontend)."""
-    from database.models import HyperliquidWallet, BinanceWallet, Account
+    from database.models import HyperliquidWallet, BinanceWallet, OkxWallet, Account  # [OKX]
     from services.hyperliquid_environment import get_hyperliquid_client
     from services.binance_trading_client import BinanceTradingClient
     from utils.encryption import decrypt_private_key
@@ -1372,8 +1372,8 @@ def execute_update_watchlist(db: Session, exchange: str, symbols: List[str]) -> 
     from services import hyperliquid_symbol_service, binance_symbol_service
 
     try:
-        if exchange not in ["hyperliquid", "binance"]:
-            return json.dumps({"error": "exchange must be 'hyperliquid' or 'binance'"})
+        if exchange not in ["hyperliquid", "binance", "okx", "okx"]:  # [OKX 新增]
+            return json.dumps({"error": "exchange must be 'hyperliquid', 'binance', or 'okx'"})
 
         if not symbols or not isinstance(symbols, list):
             return json.dumps({"error": "symbols must be a non-empty list"})
@@ -1403,7 +1403,7 @@ def execute_update_watchlist(db: Session, exchange: str, symbols: List[str]) -> 
 def execute_diagnose_trader_issues(db: Session, trader_id: int) -> str:
     """Diagnose why an AI Trader is not triggering."""
     from database.models import (
-        Account, HyperliquidWallet, BinanceWallet, AccountPromptBinding,
+        Account, HyperliquidWallet, BinanceWallet, OkxWallet, AccountPromptBinding,  # [OKX]
         AccountProgramBinding, AccountStrategyConfig, SignalPool,
         HyperliquidAccountSnapshot, BinanceAccountSnapshot, AIDecisionLog, ProgramExecutionLog
     )
@@ -1812,7 +1812,7 @@ def execute_list_traders(db: Session, trader_id: int = None) -> str:
     """List all AI Traders with bindings, wallet status, and trading status.
     Pass trader_id to get a single trader's detail."""
     from database.models import (
-        Account, HyperliquidWallet, BinanceWallet,
+        Account, HyperliquidWallet, BinanceWallet, OkxWallet,  # [OKX]
         AccountProgramBinding, AccountPromptBinding,
         TradingProgram, PromptTemplate
     )
@@ -3194,7 +3194,7 @@ def execute_search_strategy_radar(
     """Search protected Strategy Radar S2S endpoints for current strategy candidates."""
     safe_symbol = (symbol or "").strip().upper()
     safe_period = period if period in {"1h", "4h", "1d"} else "1h"
-    safe_exchange = exchange if exchange in {"hyperliquid", "binance"} else None
+    safe_exchange = exchange if exchange in {"hyperliquid", "binance", "okx", "okx"} else None  # [OKX 新增]
     safe_sort_by = sort_by if sort_by in {"relevance", "quality", "newest"} else None
     safe_risk_level = risk_level if risk_level in {"Low", "Medium", "High"} else None
     safe_timeframe = timeframe if timeframe in {"1h", "4h", "1d", "multi"} else None

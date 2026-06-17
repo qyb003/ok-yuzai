@@ -1,0 +1,179 @@
+"use client";
+
+// src/context/react/AssistantApiContext.tsx
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useEffect
+} from "react";
+import { useResource } from "@assistant-ui/tap/react";
+import {
+  normalizeEventSelector
+} from "../../types/EventTypes.js";
+import { DevToolsProviderApi } from "../../devtools/DevToolsHooks.js";
+import {
+  useAssistantClient
+} from "../../client/AssistantClient.js";
+import {
+  DerivedScopes
+} from "../../utils/tap-store/derived-scopes.js";
+import { jsx } from "react/jsx-runtime";
+var createAssistantApiField = (config) => {
+  const fn = config.get;
+  fn.source = config.source;
+  fn.query = config.query;
+  return fn;
+};
+var NO_OP_FN = () => () => {
+};
+var AssistantApiContext = createContext({
+  threads: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error("Threads is only available inside <AssistantProvider />");
+    }
+  }),
+  tools: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error("Tools is only available inside <AssistantProvider />");
+    }
+  }),
+  modelContext: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error(
+        "ModelContext is only available inside <AssistantProvider />"
+      );
+    }
+  }),
+  threadListItem: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error(
+        "ThreadListItem is only available inside <AssistantProvider />"
+      );
+    }
+  }),
+  thread: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error("Thread is only available inside <AssistantProvider />");
+    }
+  }),
+  composer: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error(
+        "Composer is only available inside <AssistantProvider />"
+      );
+    }
+  }),
+  message: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error(
+        "Message is only available inside <ThreadPrimitive.Messages />"
+      );
+    }
+  }),
+  part: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error(
+        "Part is only available inside <MessagePrimitive.Parts />"
+      );
+    }
+  }),
+  attachment: createAssistantApiField({
+    source: null,
+    query: {},
+    get: () => {
+      throw new Error(
+        "Attachment is only available inside <MessagePrimitive.Attachments /> or <ComposerPrimitive.Attachments />"
+      );
+    }
+  }),
+  subscribe: NO_OP_FN,
+  flushSync: NO_OP_FN,
+  on: (selector) => {
+    const { scope } = normalizeEventSelector(selector);
+    throw new Error(`Event scope is not available in this component: ${scope}`);
+  }
+});
+var useAssistantApiImpl = () => {
+  return useContext(AssistantApiContext);
+};
+var useExtendedAssistantApi = (scopes) => {
+  const baseApi = useAssistantApiImpl();
+  const partialApi = useResource(DerivedScopes(scopes));
+  return useMemo(() => extendApi(baseApi, partialApi), [baseApi, partialApi]);
+};
+var useExtendedAssistantApiImpl = (config) => {
+  return useAssistantClient(config);
+};
+function useAssistantApi(config) {
+  if (config) {
+    return useExtendedAssistantApiImpl(config);
+  } else {
+    return useAssistantApiImpl();
+  }
+}
+var mergeFns = (fn1, fn2) => {
+  if (fn1 === NO_OP_FN) return fn2;
+  if (fn2 === NO_OP_FN) return fn1;
+  return (...args) => {
+    fn1(...args);
+    fn2(...args);
+  };
+};
+var mergeFnsWithUnsubscribe = (fn1, fn2) => {
+  if (fn1 === NO_OP_FN) return fn2;
+  if (fn2 === NO_OP_FN) return fn1;
+  return (...args) => {
+    const unsubscribe1 = fn1(...args);
+    const unsubscribe2 = fn2(...args);
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+    };
+  };
+};
+var extendApi = (api, api2) => {
+  const api2Subscribe = api2.subscribe;
+  const api2FlushSync = api2.flushSync;
+  return {
+    ...api,
+    ...api2,
+    subscribe: mergeFnsWithUnsubscribe(
+      api.subscribe,
+      api2Subscribe ?? NO_OP_FN
+    ),
+    flushSync: mergeFns(api.flushSync, api2FlushSync ?? NO_OP_FN)
+  };
+};
+var AssistantProvider = ({ api, children, devToolsVisible = true }) => {
+  useEffect(() => {
+    if (!devToolsVisible || !api.subscribe) return void 0;
+    return DevToolsProviderApi.register(api);
+  }, [api, devToolsVisible]);
+  return /* @__PURE__ */ jsx(AssistantApiContext.Provider, { value: api, children });
+};
+export {
+  AssistantProvider,
+  createAssistantApiField,
+  extendApi,
+  useAssistantApi,
+  useAssistantApiImpl,
+  useExtendedAssistantApi
+};
+//# sourceMappingURL=AssistantApiContext.js.map

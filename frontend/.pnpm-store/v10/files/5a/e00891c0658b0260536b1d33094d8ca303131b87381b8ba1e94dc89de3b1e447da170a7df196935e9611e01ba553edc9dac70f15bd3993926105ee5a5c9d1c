@@ -1,0 +1,8 @@
+//#region src/core/utils/stream/LineDecoderStream.d.ts
+declare class LineDecoderStream extends TransformStream<string, string> {
+  private buffer;
+  constructor();
+}
+//#endregion
+export { LineDecoderStream };
+//# sourceMappingURL=LineDecoderStream.d.ts.map

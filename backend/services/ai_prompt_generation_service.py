@@ -264,7 +264,7 @@ PROMPT_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (required)"},
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (required)"},
                     "symbol": {"type": "string", "description": "Trading symbol (e.g., BTC). If omitted, returns factor library list."},
                     "factor_name": {"type": "string", "description": "Specific factor name for detailed info"},
                     "forward_period": {"type": "string", "enum": ["1h", "4h", "12h", "24h"], "description": "Forward period for effectiveness (default: 4h)"}

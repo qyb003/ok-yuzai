@@ -54,5 +54,16 @@ BINANCE_BROKER_CONFIG = BinanceBrokerConfig(
 # This limits the number of AI-executed trades per day to prevent excessive API usage
 BINANCE_DAILY_QUOTA_LIMIT = 40
 
+# [OKX 新增] OKX 配置
+class OkxBrokerConfig(BaseModel):
+    """OKX Broker Configuration (optional)"""
+    broker_id: str = ""
+
+
+OKX_BROKER_CONFIG = OkxBrokerConfig(
+    broker_id=os.getenv("OKX_BROKER_ID", "")
+)
+OKX_DAILY_QUOTA_LIMIT = int(os.getenv("OKX_DAILY_QUOTA_LIMIT", "40"))
+
 # Factor Engine toggle (set to "true" to enable factor computation)
 FACTOR_ENGINE_ENABLED = os.getenv("FACTOR_ENGINE_ENABLED", "false").lower() == "true"

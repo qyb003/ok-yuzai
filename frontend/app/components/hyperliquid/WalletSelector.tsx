@@ -9,7 +9,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useTranslation } from 'react-i18next'
 
-export type ExchangeType = 'hyperliquid' | 'binance'
+export type ExchangeType = 'hyperliquid' | 'binance' | 'okx'
 
 export interface WalletOption {
   wallet_id: number
@@ -53,7 +53,9 @@ export default function WalletSelector({
       setLoading(true)
       const endpoint = exchange === 'hyperliquid'
         ? '/api/hyperliquid/wallets/all'
-        : '/api/binance/wallets/all'
+        : exchange === 'okx'
+          ? '/api/okx/wallets/all'  // [OKX 修复] 之前错误路由到 Binance
+          : '/api/binance/wallets/all'
 
       const response = await fetch(endpoint)
       if (!response.ok) {
@@ -61,10 +63,14 @@ export default function WalletSelector({
       }
       const data = await response.json()
 
-      // Add exchange type to each wallet
-      const walletsWithExchange = data.map((w: any) => ({
+      // [OKX 修复] 各交易所返回格式不同：HL/BN可能直接返回数组，OKX返回 {wallets: [...]}
+      const rawWallets = Array.isArray(data) ? data : (data.wallets || data.data || [])
+
+      // [OKX 修复] 归一化字段：OKX用 id，HL/BN 用 wallet_id
+      const walletsWithExchange = rawWallets.map((w: any) => ({
         ...w,
-        exchange
+        wallet_id: w.wallet_id ?? w.id,  // [OKX] OKX返回id, HL/BN返回wallet_id
+        exchange,
       }))
       setWallets(walletsWithExchange)
 
@@ -125,6 +131,9 @@ export default function WalletSelector({
       return `${wallet.wallet_address.slice(0, 6)}...${wallet.wallet_address.slice(-4)}`
     } else if (wallet.exchange === 'binance' && wallet.api_key_masked) {
       return wallet.api_key_masked
+    } else if (wallet.exchange === 'okx') {
+      // [OKX] OKX wallet uses account_name + env as display
+      return wallet.account_name ? `${wallet.account_name} (${wallet.environment || 'testnet'})` : `OKX #${wallet.account_id}`
     }
     return ''
   }

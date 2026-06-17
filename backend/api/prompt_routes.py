@@ -234,7 +234,7 @@ def preview_prompt(
         "promptTemplateKey": "pro",  # Optional: Fallback to database template if templateText not provided
         "accountIds": [1, 2],
         "symbols": ["BTC", "ETH"],
-        "exchanges": ["hyperliquid", "binance"]  # Optional: Array of exchanges (default: ["hyperliquid"])
+        "exchanges": ["hyperliquid", "binance", "okx"]  # Optional: Array of exchanges (default: ["hyperliquid"])
     }
 
     Returns:

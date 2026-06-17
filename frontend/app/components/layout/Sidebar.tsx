@@ -181,6 +181,11 @@ export default function Sidebar({ currentPage = 'comprehensive', onPageChange, o
                 <ExchangeIcon exchangeId="binance" size={18} />
                 <span className="text-sm text-foreground">Binance</span>
               </div>
+              {/* [OKX 新增] */}
+              <div className="flex items-center gap-2.5">
+                <ExchangeIcon exchangeId="okx" size={18} />
+                <span className="text-sm text-foreground">OKX</span>
+              </div>
             </button>
           </div>
 

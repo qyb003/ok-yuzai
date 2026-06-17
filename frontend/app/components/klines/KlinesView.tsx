@@ -25,7 +25,7 @@ interface MarketData {
 
 export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
   const { t } = useTranslation()
-  const [selectedExchange, setSelectedExchange] = useState<'hyperliquid' | 'binance'>('hyperliquid')
+  const [selectedExchange, setSelectedExchange] = useState<'hyperliquid' | 'binance' | 'okx'>('hyperliquid')
   const collectionDays = useCollectionDays(selectedExchange)
   const [selectedSymbol, setSelectedSymbol] = useState<string>('BTC')
   const [selectedPeriod, setSelectedPeriod] = useState<string>('1m')
@@ -52,7 +52,7 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
     }
     const minutes = periodMinutes[period] || 1
 
-    if (exchange === 'binance') {
+    if (exchange === 'binance' || exchange === 'okx') {
       return {
         cvd: true,
         taker_volume: true,
@@ -140,9 +140,11 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
 
   const fetchWatchlist = async () => {
     try {
-      const endpoint = selectedExchange === 'binance'
-        ? '/api/binance/symbols/watchlist'
-        : '/api/hyperliquid/symbols/watchlist'
+      const endpoint = selectedExchange === 'hyperliquid'
+        ? '/api/hyperliquid/symbols/watchlist'
+        : selectedExchange === 'okx'
+          ? '/api/binance/symbols/watchlist'
+          : '/api/binance/symbols/watchlist'
       const response = await fetch(endpoint)
       const data = await response.json()
       const symbols = data.symbols || []
@@ -198,6 +200,16 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
             >
               <img src="/static/binance_logo.svg" alt="Binance" width={14} height={14} />
             </button>
+            <button
+              onClick={() => setSelectedExchange('okx')}
+              className={`p-1.5 rounded transition-all ${
+                selectedExchange === 'okx'
+                  ? 'bg-primary text-primary-foreground'
+                  : ''
+              }`}
+            >
+              <img src="/static/okx_logo.svg" alt="OKX" width={14} height={14} />
+            </button>
           </div>
           <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
             <SelectTrigger className="flex-1 h-9">
@@ -252,6 +264,17 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
                   <img src="/static/binance_logo.svg" alt="Binance" width={16} height={16} />
                   Binance
                 </button>
+                <button
+                  onClick={() => setSelectedExchange('okx')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded transition-all ${
+                    selectedExchange === 'okx'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  <img src="/static/okx_logo.svg" alt="OKX" width={16} height={16} />
+                  OKX
+                </button>
               </div>
 
               {/* Symbol and Period */}
@@ -299,7 +322,9 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
                   <span>
                     {selectedExchange === 'hyperliquid'
                       ? t('kline.mainnetWarning', 'K-line analysis is only available for Mainnet environment')
-                      : t('kline.binanceWarning', 'K-line analysis is only available for Binance Futures production environment')
+                      : selectedExchange === 'okx'
+                        ? t('kline.binanceWarning', 'K-line analysis is only available for Binance Futures production environment')
+                        : t('kline.binanceWarning', 'K-line analysis is only available for Binance Futures production environment')
                     }
                   </span>
                 </p>
@@ -307,7 +332,9 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
                   <p className="text-xs text-muted-foreground mt-1">
                     {selectedExchange === 'hyperliquid'
                       ? t('common.collectionDaysHint', 'Hyperliquid market flow data collected for {{days}} days', { days: collectionDays })
-                      : t('common.binanceCollectionDaysHint', 'Binance market flow data collected for {{days}} days', { days: collectionDays })
+                      : selectedExchange === 'okx'
+                        ? t('common.binanceCollectionDaysHint', 'Binance market flow data collected for {{days}} days', { days: collectionDays })
+                        : t('common.binanceCollectionDaysHint', 'Binance market flow data collected for {{days}} days', { days: collectionDays })
                     }
                   </p>
                 )}

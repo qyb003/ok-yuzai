@@ -33,7 +33,7 @@ from sqlalchemy import func
 from database.connection import SessionLocal
 from database.models import (
     TradingProgram, AccountProgramBinding, ProgramExecutionLog,
-    Account, HyperliquidWallet, BinanceWallet, AIDecisionLog,
+    Account, HyperliquidWallet, BinanceWallet, OkxWallet, AIDecisionLog,  # [OKX]
     User, UserSubscription
 )
 from program_trader.executor import execute_strategy
@@ -365,6 +365,16 @@ class ProgramExecutionService:
                         logger.warning(f"[ProgramExecution] Failed to create Binance trading client: {e}")
                 # Get leverage settings from BinanceWallet
                 leverage_settings = self._get_binance_leverage_settings(db, account.id, environment or "mainnet")
+            # [OKX 新增] OKX 交易客户端创建
+            elif exchange == "okx":
+                if wallet_address:
+                    try:
+                        from services.okx_environment import get_okx_client
+                        trading_client = get_okx_client(db, account.id, override_environment=environment or "mainnet")
+                        logger.info(f"[ProgramExecution] OKX client created for account {account.id}")
+                    except Exception as e:
+                        logger.warning(f"[ProgramExecution] Failed to create OKX trading client: {e}")
+                leverage_settings = self._get_okx_leverage_settings(db, account.id, environment or "mainnet")
             else:
                 # Use Hyperliquid trading client (default)
                 if environment and wallet_address:
@@ -487,6 +497,15 @@ class ProgramExecutionService:
             ).first()
             # Return a placeholder to indicate wallet is configured
             return "binance_configured" if wallet and wallet.api_key_encrypted else None
+        # [OKX 新增] OKX 钱包检查
+        elif exchange == "okx":
+            from database.models import OkxWallet
+            wallet = db.query(OkxWallet).filter(
+                OkxWallet.account_id == account.id,
+                OkxWallet.environment == environment,
+                OkxWallet.is_active == "true"
+            ).first()
+            return "okx_configured" if wallet and wallet.api_key_encrypted else None
         else:
             # Hyperliquid wallet
             wallet = db.query(HyperliquidWallet).filter(
@@ -509,6 +528,22 @@ class ProgramExecutionService:
                 "default_leverage": wallet.default_leverage or 3
             }
         return {"max_leverage": 10, "default_leverage": 3}
+
+    # [OKX 新增] OKX 杠杆设置获取
+    def _get_okx_leverage_settings(self, db, account_id: int, environment: str) -> dict:
+        """Get leverage settings from OkxWallet."""
+        from database.models import OkxWallet
+        wallet = db.query(OkxWallet).filter(
+            OkxWallet.account_id == account_id,
+            OkxWallet.environment == environment,
+            OkxWallet.is_active == "true"
+        ).first()
+        if wallet:
+            return {
+                "max_leverage": wallet.max_leverage or 20,
+                "default_leverage": wallet.default_leverage or 3
+            }
+        return {"max_leverage": 20, "default_leverage": 3}
 
     def _build_market_data(
         self,

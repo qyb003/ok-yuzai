@@ -1,0 +1,1 @@
+{"version":3,"file":"MessageRuntimeClient.d.ts","sourceRoot":"","sources":["../../../src/legacy-runtime/client/MessageRuntimeClient.ts"],"names":[],"mappings":"AAOA,OAAO,EAAE,cAAc,EAAE,MAAM,2BAA2B,CAAC;AAK3D,OAAO,EAAE,SAAS,EAAE,MAAM,OAAO,CAAC;AAClC,OAAO,EAEL,gBAAgB,EACjB,MAAM,4BAA4B,CAAC;AAyBpC,eAAO,MAAM,aAAa;;;;;aAKb,cAAc;iBACV,SAAS,CAAC,MAAM,CAAC;EA6FjC,CAAC"}

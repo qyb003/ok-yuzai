@@ -360,7 +360,8 @@ async def get_kline_with_indicators(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"获取K线和指标数据失败: {e}")
+        import traceback
+        logger.error(f"[KLINE ERROR] market={market} symbol={symbol}: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取K线和指标数据失败: {str(e)}")
 
 

@@ -48,7 +48,7 @@ def upsert_strategy(
     trigger_interval: Optional[int] = None,
     signal_pool_id: Optional[int] = None,  # Deprecated: kept for backward compatibility
     signal_pool_ids: Optional[List[int]] = None,  # New: list of pool IDs
-    exchange: str = "hyperliquid",  # "hyperliquid" or "binance"
+    exchange: str = "hyperliquid",  # "hyperliquid", "binance", or "okx"
 ) -> AccountStrategyConfig:
     print(f"upsert_strategy called with: account_id={account_id}, signal_pool_ids={signal_pool_ids}, signal_pool_id={signal_pool_id}")
     strategy = get_strategy_by_account(db, account_id)

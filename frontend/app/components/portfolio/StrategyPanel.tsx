@@ -393,6 +393,8 @@ export default function StrategyPanel({
                     <SelectContent>
                       <SelectItem value="hyperliquid">{t('strategy.exchangeHyperliquid', 'Hyperliquid')}</SelectItem>
                       <SelectItem value="binance">{t('strategy.exchangeBinance', 'Binance')}</SelectItem>
+                      {/* [OKX 新增] OKX 交易所选项 */}
+                      <SelectItem value="okx">OKX</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">{t('strategy.exchangeHint', 'Select exchange for market data and trade execution')}</p>

@@ -69,7 +69,7 @@ class FactorEffectivenessService:
     def _run(self):
         db: Session = SessionLocal()
         try:
-            for ex in ["hyperliquid", "binance"]:
+            for ex in ["hyperliquid", "binance", "okx"]:  # [OKX 新增]
                 self.compute_for_exchange(db, ex)
         except Exception as e:
             logger.error(f"[FactorEffectiveness] error: {e}")

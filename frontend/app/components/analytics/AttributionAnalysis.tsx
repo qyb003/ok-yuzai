@@ -374,6 +374,13 @@ export default function AttributionAnalysis() {
                   Binance
                 </span>
               </SelectItem>
+              {/* [OKX 新增] */}
+              <SelectItem value="okx">
+                <span className="flex items-center gap-2">
+                  <img src="/static/okx_logo.svg" alt="" className="w-4 h-4" />
+                  OKX
+                </span>
+              </SelectItem>
             </SelectContent>
           </Select>
 

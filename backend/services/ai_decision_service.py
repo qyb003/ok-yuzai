@@ -267,6 +267,10 @@ def _get_realtime_ticker_snapshot(
     """Fetch a single realtime ticker snapshot for all symbols in this prompt build."""
     from services.market_data import get_ticker_data
 
+    # [OKX 修复] OKX 使用 okx_trading_client 获取行情，不再走 Hyperliquid
+    if exchange == "okx":
+        return _get_okx_ticker_snapshot(symbols, environment)
+
     market_param = "binance" if exchange == "binance" else "CRYPTO"
     snapshot: Dict[str, Dict[str, Any]] = {}
 
@@ -278,6 +282,74 @@ def _get_realtime_ticker_snapshot(
         except Exception as err:
             logger.warning(f"Failed to fetch realtime ticker for {symbol} ({exchange}/{environment}): {err}")
 
+    return snapshot
+
+
+# [OKX 新增] OKX 专用 ticker 获取（不走 Hyperliquid 的 market_data 路径）
+def _get_okx_ticker_snapshot(
+    symbols: List[str],
+    environment: str = "testnet",
+) -> Dict[str, Dict[str, Any]]:
+    """Fetch realtime ticker snapshot for all symbols using OKX REST API."""
+    from services.okx_trading_client import OkxTradingClient
+    from database.connection import SessionLocal
+    from database.models import OkxWallet
+    from utils.encryption import decrypt_private_key
+
+    snapshot: Dict[str, Dict[str, Any]] = {}
+    db = SessionLocal()
+    try:
+        # 找到第一个活跃的 OKX 钱包获取行情（公开行情不需要签名，但走一致的途径）
+        wallet = db.query(OkxWallet).filter(
+            OkxWallet.is_active == "true",
+            OkxWallet.environment == environment,
+        ).first()
+        if not wallet:
+            # 无钱包时用公共 REST API 直连获取 ticker
+            import requests
+            for symbol in symbols:
+                try:
+                    from services.exchanges.symbol_mapper import SymbolMapper
+                    inst_id = SymbolMapper.to_exchange(symbol, "okx")
+                    resp = requests.get(
+                        "https://www.okx.com/api/v5/market/ticker",
+                        params={"instId": inst_id},
+                        timeout=5,
+                    )
+                    data = resp.json()
+                    ticker_list = data.get("data", [])
+                    if ticker_list:
+                        t = ticker_list[0]
+                        snapshot[symbol] = {
+                            "symbol": symbol,
+                            "price": float(t.get("last", 0) or 0),
+                            "bid": float(t.get("bidPx", 0) or 0),
+                            "ask": float(t.get("askPx", 0) or 0),
+                        }
+                except Exception as err:
+                    logger.warning(f"[OKX] Ticker fetch failed for {symbol}: {err}")
+            return snapshot
+
+        api_key = decrypt_private_key(wallet.api_key_encrypted)
+        secret_key = decrypt_private_key(wallet.secret_key_encrypted)
+        passphrase = decrypt_private_key(wallet.passphrase_encrypted)
+        client = OkxTradingClient(
+            api_key=api_key,
+            secret_key=secret_key,
+            passphrase=passphrase,
+            environment=environment,
+        )
+        for symbol in symbols:
+            try:
+                ticker = client.get_ticker(symbol)
+                if ticker and ticker.get("price", 0) > 0:
+                    snapshot[symbol] = ticker
+            except Exception as err:
+                logger.warning(f"[OKX] Ticker fetch failed for {symbol}: {err}")
+    except Exception as e:
+        logger.warning(f"[OKX] Failed to create OKX client for ticker: {e}")
+    finally:
+        db.close()
     return snapshot
 
 
@@ -642,7 +714,7 @@ def _build_prompt_context(
         environment: Trading environment (mainnet/testnet)
         template_text: Prompt template text for parsing K-line variables
         trigger_context: Context about what triggered this decision (signal or scheduled)
-        exchange: Exchange to use for market data ("hyperliquid" or "binance")
+        exchange: Exchange to use for market data ("hyperliquid", "binance", or "okx")
 
     Returns:
         Complete context dictionary ready for template.format_map()
@@ -913,7 +985,7 @@ def _build_prompt_context(
     recent_trades_summary = "No recent trade history available"
 
     # Support both Hyperliquid and Binance exchanges
-    if (hyperliquid_state or exchange == "binance") and environment in ("testnet", "mainnet"):
+    if (hyperliquid_state or exchange == "binance" or exchange == "okx") and environment in ("testnet", "mainnet"):  # [OKX 新增]
         try:
             from database.connection import SessionLocal
 
@@ -945,6 +1017,15 @@ def _build_prompt_context(
                         open_orders = client.get_open_orders_formatted(db_session)
                     else:
                         recent_trades_summary = "Binance wallet not configured"
+                # [OKX 新增] OKX 交易客户端
+                elif exchange == "okx":
+                    from services.okx_environment import get_okx_client
+                    try:
+                        client = get_okx_client(db_session, account.id, override_environment=environment)
+                        recent_trades = client.get_recent_closed_trades(db_session, limit=5)
+                        open_orders = client.get_open_orders_formatted(db_session)
+                    except ValueError:
+                        recent_trades_summary = "OKX wallet not configured for this environment"
                 else:
                     # Get Hyperliquid trading client (uses get_hyperliquid_client to support API Wallet)
                     from services.hyperliquid_environment import get_hyperliquid_client
@@ -1971,7 +2052,7 @@ def call_ai_for_decision(
         hyperliquid_state: Optional Hyperliquid account state for real trading
         symbol_metadata: Optional mapping of symbol -> display name overrides
         trigger_context: Optional context about what triggered this decision (signal or scheduled)
-        exchange: Exchange to use for market data ("hyperliquid" or "binance")
+        exchange: Exchange to use for market data ("hyperliquid", "binance", or "okx")
     """
     # Check if this is a default API key
     if _is_default_api_key(account.api_key):
@@ -2890,7 +2971,7 @@ def _build_factor_context(
         # live get_factor() and Program backtest get_factor().
         for symbol, period, factor_name, var_name in factor_vars:
             try:
-                market = "binance" if exchange == "binance" else "CRYPTO"
+                market = "okx" if exchange == "okx" else ("binance" if exchange == "binance" else "CRYPTO")  # [OKX 修复]
                 snapshot = compute_factor_snapshot(
                     db=db,
                     symbol=symbol,
@@ -3362,7 +3443,7 @@ def _build_klines_and_indicators_context(
         variable_groups: Parsed variable groups from _parse_kline_indicator_variables
         db: Database session
         environment: Trading environment (mainnet/testnet)
-        exchange: Exchange to use for market data ("hyperliquid" or "binance")
+        exchange: Exchange to use for market data ("hyperliquid", "binance", or "okx")
 
     Returns:
         Dict mapping variable names to formatted strings
@@ -3436,7 +3517,7 @@ def _process_single_symbol_period(
         period: Time period (e.g., "5m", "1h") or None for market data
         requirements: Dict with 'klines', 'indicators', 'flow_indicators', 'market_data' keys
         environment: Trading environment (mainnet/testnet)
-        exchange: Exchange to use for market data ("hyperliquid" or "binance")
+        exchange: Exchange to use for market data ("hyperliquid", "binance", or "okx")
 
     Returns:
         Dict mapping variable names to formatted strings
@@ -3444,8 +3525,13 @@ def _process_single_symbol_period(
     from services.market_data import get_kline_data, get_ticker_data
 
     context = {}
-    # Determine market parameter based on exchange
-    market_param = "binance" if exchange == "binance" else "CRYPTO"
+    # [OKX 修复] 三种 market 类型: okx→OkxAdapter, binance→BinanceAdapter, else→Hyperliquid
+    if exchange == "okx":
+        market_param = "okx"
+    elif exchange == "binance":
+        market_param = "binance"
+    else:
+        market_param = "CRYPTO"
 
     try:
         # Handle market data (no period)

@@ -1,0 +1,76 @@
+"use client";
+
+// src/primitives/thread/useThreadViewportAutoScroll.tsx
+import { useComposedRefs } from "@radix-ui/react-compose-refs";
+import { useCallback, useRef } from "react";
+import { useAssistantEvent } from "../../context/index.js";
+import { useOnResizeContent } from "../../utils/hooks/useOnResizeContent.js";
+import { useOnScrollToBottom } from "../../utils/hooks/useOnScrollToBottom.js";
+import { useManagedRef } from "../../utils/hooks/useManagedRef.js";
+import { writableStore } from "../../context/ReadonlyStore.js";
+import { useThreadViewportStore } from "../../context/react/ThreadViewportContext.js";
+var useThreadViewportAutoScroll = ({
+  autoScroll
+}) => {
+  const divRef = useRef(null);
+  const threadViewportStore = useThreadViewportStore();
+  if (autoScroll === void 0) {
+    autoScroll = threadViewportStore.getState().turnAnchor !== "top";
+  }
+  const lastScrollTop = useRef(0);
+  const scrollingToBottomBehaviorRef = useRef(null);
+  const scrollToBottom = useCallback((behavior) => {
+    const div = divRef.current;
+    if (!div) return;
+    scrollingToBottomBehaviorRef.current = behavior;
+    div.scrollTo({ top: div.scrollHeight, behavior });
+  }, []);
+  const handleScroll = () => {
+    const div = divRef.current;
+    if (!div) return;
+    const isAtBottom = threadViewportStore.getState().isAtBottom;
+    const newIsAtBottom = Math.abs(div.scrollHeight - div.scrollTop - div.clientHeight) < 1 || div.scrollHeight <= div.clientHeight;
+    if (!newIsAtBottom && lastScrollTop.current < div.scrollTop) {
+    } else {
+      if (newIsAtBottom) {
+        scrollingToBottomBehaviorRef.current = null;
+      }
+      if (newIsAtBottom !== isAtBottom) {
+        writableStore(threadViewportStore).setState({
+          isAtBottom: newIsAtBottom
+        });
+      }
+    }
+    lastScrollTop.current = div.scrollTop;
+  };
+  const resizeRef = useOnResizeContent(() => {
+    const scrollBehavior = scrollingToBottomBehaviorRef.current;
+    if (scrollBehavior) {
+      scrollToBottom(scrollBehavior);
+    } else if (autoScroll && threadViewportStore.getState().isAtBottom) {
+      scrollToBottom("instant");
+    }
+    handleScroll();
+  });
+  const scrollRef = useManagedRef((el) => {
+    el.addEventListener("scroll", handleScroll);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+    };
+  });
+  useOnScrollToBottom(({ behavior }) => {
+    scrollToBottom(behavior);
+  });
+  useAssistantEvent("thread.run-start", () => {
+    scrollingToBottomBehaviorRef.current = "auto";
+    requestAnimationFrame(() => {
+      scrollToBottom("auto");
+    });
+  });
+  const autoScrollRef = useComposedRefs(resizeRef, scrollRef, divRef);
+  return autoScrollRef;
+};
+export {
+  useThreadViewportAutoScroll
+};
+//# sourceMappingURL=useThreadViewportAutoScroll.js.map

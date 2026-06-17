@@ -82,6 +82,20 @@ export default function ExchangeIcon({ exchangeId, className = '', size = 16 }: 
           </linearGradient>
         </defs>
       </svg>
+    ),
+    // [OKX 新增] OKX 图标
+    okx: (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 88 88"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={className}
+      >
+        <rect width="88" height="88" rx="16" fill="#000" />
+        <text x="44" y="56" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold" fontFamily="Arial, sans-serif">OKX</text>
+      </svg>
     )
   }
 

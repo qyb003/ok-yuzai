@@ -66,7 +66,7 @@ SHARED_SIGNAL_TOOLS = [
                 "properties": {
                     "exchange": {
                         "type": "string",
-                        "enum": ["hyperliquid", "binance", "all"],
+                        "enum": ["hyperliquid", "binance", "okx", "all"],
                         "description": "Filter signal pools by exchange. Use 'all' to get pools from all exchanges (default: all)",
                         "default": "all"
                     }

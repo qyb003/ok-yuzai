@@ -640,6 +640,32 @@ class BinanceWallet(Base):
     account = relationship("Account")
 
 
+# [OKX 新增] OKX 钱包表 — 存储 OKX API 凭证（API Key + Secret Key + Passphrase）
+class OkxWallet(Base):
+    """Store OKX Futures API credentials per AI Trader per environment"""
+    __tablename__ = "okx_wallets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
+    environment = Column(String(20), nullable=False)  # 'testnet' or 'mainnet'
+    api_key_encrypted = Column(String(500), nullable=False)
+    secret_key_encrypted = Column(String(500), nullable=False)
+    passphrase_encrypted = Column(String(500), nullable=False)  # [OKX] OKX 特有的 Passphrase 字段
+    max_leverage = Column(Integer, nullable=False, default=20)
+    default_leverage = Column(Integer, nullable=False, default=1)
+    is_active = Column(String(10), nullable=False, default="true")
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
+    )
+
+    __table_args__ = (
+        UniqueConstraint('account_id', 'environment', name='uq_okx_wallets_account_environment'),
+    )
+
+    account = relationship("Account")
+
+
 class BinanceAccountSnapshot(Base):
     """Store Binance account state snapshots"""
     __tablename__ = "binance_account_snapshots"

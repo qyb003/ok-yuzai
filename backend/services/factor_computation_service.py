@@ -94,7 +94,7 @@ class FactorComputationService:
         """Compute factors for every active symbol on all exchanges."""
         db: Session = SessionLocal()
         try:
-            for exchange in ["hyperliquid", "binance"]:
+            for exchange in ["hyperliquid", "binance", "okx"]:  # [OKX 新增]
                 symbols = self._get_symbols_for_exchange(db, exchange)
                 if not symbols:
                     continue
@@ -112,6 +112,8 @@ class FactorComputationService:
         try:
             if exchange == "binance":
                 from services.binance_symbol_service import get_selected_symbols
+            elif exchange == "okx":  # [OKX 新增]
+                from services.okx_symbol_service import get_selected_symbols
             else:
                 from services.hyperliquid_symbol_service import get_selected_symbols
             return get_selected_symbols()

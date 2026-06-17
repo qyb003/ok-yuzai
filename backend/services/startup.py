@@ -45,6 +45,15 @@ def initialize_services():
         schedule_binance_symbol_refresh()
         logger.info("[Binance] Symbol catalog refreshed and periodic refresh scheduled")
 
+        # [OKX 新增] OKX symbol 目录 + 定期刷新
+        from services.okx_symbol_service import (
+            refresh_okx_symbols,
+            schedule_symbol_refresh_task as schedule_okx_symbol_refresh,
+        )
+        refresh_okx_symbols()
+        schedule_okx_symbol_refresh()
+        logger.info("[OKX] Symbol catalog refreshed and periodic refresh scheduled")
+
         # Set up market-related scheduled tasks
         setup_market_tasks()
         logger.info("Market scheduled tasks have been set up")
@@ -127,6 +136,11 @@ def initialize_services():
         asyncio.create_task(binance_snapshot_service.start())
         logger.info("Binance snapshot service started (5-minute interval)")
 
+        # [OKX 新增] OKX 账户快照服务
+        from services.okx_snapshot_service import okx_snapshot_service
+        asyncio.create_task(okx_snapshot_service.start())
+        logger.info("OKX snapshot service started (5-minute interval)")
+
         # Start K-line realtime collection service
         from services.kline_realtime_collector import realtime_collector
         asyncio.create_task(realtime_collector.start())
@@ -155,6 +169,15 @@ def initialize_services():
         binance_collector.start(symbols=binance_watchlist if binance_watchlist else ["BTC"])
         print("Binance data collector started")
         logger.info(f"[Binance] Data collector started with symbols: {binance_watchlist}")
+
+        # [OKX 新增] 启动 OKX 数据采集器
+        from services.exchanges.okx_collector import okx_collector
+        from services.okx_symbol_service import get_selected_symbols as get_okx_selected_symbols
+        okx_watchlist = get_okx_selected_symbols()
+        print(f"Starting OKX data collector with OKX watchlist: {okx_watchlist}")
+        okx_collector.start(symbols=okx_watchlist if okx_watchlist else ["BTC"])
+        print("OKX data collector started")
+        logger.info(f"[OKX] Data collector started with symbols: {okx_watchlist}")
 
         # Start Binance WebSocket collector (15-second Taker Volume aggregation)
         from services.exchanges.binance_ws_collector import binance_ws_collector
@@ -227,6 +250,14 @@ def shutdown_services():
         # Stop Binance WebSocket collector
         from services.exchanges.binance_ws_collector import binance_ws_collector
         binance_ws_collector.stop()
+
+        # [OKX 新增] 停止 OKX 数据采集器
+        from services.exchanges.okx_collector import okx_collector
+        okx_collector.stop()
+
+        # [OKX 新增] 停止 OKX 快照服务
+        from services.okx_snapshot_service import okx_snapshot_service
+        okx_snapshot_service.stop()
 
         # Stop News Collector
         from services.news_collector_service import news_collector_service

@@ -27,6 +27,52 @@ import type { ManualOrderRequest, HyperliquidBalance, HyperliquidPosition } from
 import { useTranslation } from 'react-i18next';
 import type { ExchangeType } from './WalletSelector';
 
+// [OKX 新增] OKX API 辅助函数（调用 /api/okx/... 端点，字段归一化为 camelCase）
+async function getOkxBalance(accountId: number, environment: string) {
+  const res = await fetch(`/api/okx/accounts/${accountId}/balance?environment=${environment}`)
+  if (!res.ok) throw new Error('Failed to fetch OKX balance')
+  const data = await res.json()
+  const b = data.balance || {}
+  return {
+    totalEquity: b.total_equity ?? 0,
+    availableBalance: b.available_balance ?? 0,
+    usedMargin: b.used_margin ?? 0,
+    unrealizedPnl: b.unrealized_pnl ?? 0,
+    marginUsagePercent: b.margin_usage_percent ?? 0,
+  }
+}
+// [OKX 修复] 调用真正的 OKX ticker 端点获取实时价格
+async function getOkxPrice(symbol: string) {
+  try {
+    const res = await fetch(`/api/okx/ticker/${symbol}`)
+    if (!res.ok) throw new Error('Ticker fetch failed')
+    const data = await res.json()
+    return data.price || 0
+  } catch (e) {
+    console.error('[OKX] getOkxPrice failed:', e)
+    return 0
+  }
+}
+async function getOkxPositions(accountId: number, environment: string) {
+  const res = await fetch(`/api/okx/accounts/${accountId}/positions?environment=${environment}`)
+  if (!res.ok) throw new Error('Failed to fetch OKX positions')
+  const data = await res.json()
+  // [OKX 修复] 字段归一化为 camelCase 匹配前端期望格式
+  const positions = (data.positions || []).map((p: any) => ({
+    ...p,
+    coin: p.coin ?? p.symbol ?? '',
+    szi: p.szi ?? 0,
+    entryPx: p.entry_px ?? 0,
+    positionValue: p.position_value ?? 0,
+    unrealizedPnl: p.unrealized_pnl ?? 0,
+    marginUsed: p.margin_used ?? 0,
+    liquidationPx: p.liquidation_px ?? 0,
+    leverage: p.leverage ?? 1,
+    markPrice: p.mark_price ?? 0,
+  }))
+  return { positions }
+}
+
 interface OrderFormProps {
   accountId: number;
   environment: 'testnet' | 'mainnet';
@@ -85,8 +131,11 @@ export default function OrderForm({
 
   const loadBalance = async () => {
     try {
+      // [OKX 修改] 三方交易所分发
       const data = exchange === 'hyperliquid'
         ? await getHyperliquidBalance(accountId, environment)
+        : exchange === 'okx'
+        ? await getOkxBalance(accountId, environment)
         : await getBinanceBalance(accountId, environment);
       setBalance(data);
     } catch (error) {
@@ -98,6 +147,8 @@ export default function OrderForm({
     try {
       const priceValue = exchange === 'hyperliquid'
         ? await getCurrentPrice(symbol)
+        : exchange === 'okx'
+        ? await getOkxPrice(symbol)
         : await getBinancePrice(symbol);
       setCurrentPrice(priceValue);
     } catch (error) {
@@ -109,6 +160,8 @@ export default function OrderForm({
     try {
       const data = exchange === 'hyperliquid'
         ? await getHyperliquidPositions(accountId, environment)
+        : exchange === 'okx'
+        ? await getOkxPositions(accountId, environment)
         : await getBinancePositions(accountId, environment);
       setPositions(data.positions || []);
     } catch (error) {
@@ -230,6 +283,28 @@ export default function OrderForm({
         } else {
           toast.error(`Order failed: Unknown status (${status})`);
         }
+      // [OKX 新增] OKX 下单
+      } else if (exchange === 'okx') {
+        result = await fetch(`/api/okx/accounts/${accountId}/order?environment=${environment}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol,
+            side: isBuy ? 'BUY' : 'SELL',
+            quantity: parseFloat(size),
+            orderType: 'MARKET',
+            leverage: side !== 'close' ? leverage : 1,
+            reduceOnly: side === 'close',
+            takeProfitPrice: takeProfitPrice && parseFloat(takeProfitPrice) > 0 ? parseFloat(takeProfitPrice) : undefined,
+            stopLossPrice: stopLossPrice && parseFloat(stopLossPrice) > 0 ? parseFloat(stopLossPrice) : undefined,
+          }),
+        }).then(r => r.json());
+        const okxStatus = result?.order?.status || result?.status || 'error';
+        if (okxStatus === 'filled' || okxStatus === 'resting') {
+          toast.success(`Order ${okxStatus}! ${side.toUpperCase()} ${size} ${symbol}`);
+        } else {
+          toast.error(`Order failed: ${result?.order?.error || result?.error || 'Unknown error'}`);
+        }
       } else {
         // Binance order
         result = await placeBinanceOrder(accountId, {
@@ -248,7 +323,6 @@ export default function OrderForm({
         const avgPrice = result.avg_price || result.price;
         const priceText = avgPrice ? ` @ $${avgPrice.toFixed(2)}` : '';
 
-        // Unified status: "filled" or "resting" (same as Hyperliquid)
         if (status === 'filled') {
           toast.success(`Order Filled! ${side.toUpperCase()} ${size} ${symbol}${priceText}`);
         } else if (status === 'resting') {

@@ -17,6 +17,7 @@ NOISE = "NOISE"        # Can be safely ignored
 # Exchange tags
 HL = "hyperliquid"
 BN = "binance"
+OK = "okx"  # [OKX 新增]
 ALL = "all"
 
 REGISTRY: List[Dict] = [
@@ -56,6 +57,17 @@ REGISTRY: List[Dict] = [
      "affects": "trade_execution", "suggestion": "Binance margin insufficient for this order."},
     {"pattern": r"-1021.*Timestamp.*recvWindow|recvWindow", "exchange": BN, "severity": CRITICAL,
      "affects": "connectivity", "suggestion": "Signed request timestamp drifted outside Binance recvWindow. Check client time sync and transient network delay."},
+    # -- OKX --  [OKX 新增]
+    {"pattern": r"OKX returned invalid price", "exchange": OK, "severity": CRITICAL,
+     "affects": "price_feed", "suggestion": "OKX API returned zero/invalid price. Check symbol availability."},
+    {"pattern": r"Failed to get price from OKX", "exchange": OK, "severity": CRITICAL,
+     "affects": "price_feed", "suggestion": "Cannot fetch OKX price. Verify API key permissions and network."},
+    {"pattern": r"OKX.*connection.*refused|OKX.*timeout|www\.okx\.com.*timeout", "exchange": OK, "severity": CRITICAL,
+     "affects": "connectivity", "suggestion": "Network issue connecting to OKX API. Check your network."},
+    {"pattern": r"OKX API.*request.*failed|OKX API 错误 429", "exchange": OK, "severity": WARNING,
+     "affects": "rate_limit", "suggestion": "OKX rate limit hit. Request will auto-retry."},
+    {"pattern": r"OKX.*invalid credentials", "exchange": OK, "severity": CRITICAL,
+     "affects": "auth", "suggestion": "OKX API credentials invalid. Re-bind API Key/Secret/Passphrase."},
 
     # -- LLM / AI --
     {"pattern": r"LLM.*call.*failed|Failed to call LLM|AI provider.*error", "exchange": ALL, "severity": CRITICAL,

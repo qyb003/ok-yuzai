@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useTranslation } from 'react-i18next'
 import HyperliquidWalletSection from './HyperliquidWalletSection'
 import BinanceWalletSection from './BinanceWalletSection'
+import OkxWalletSection from './OkxWalletSection'  // [OKX 新增]
 import ExchangeIcon from '@/components/exchange/ExchangeIcon'
 import { getAccountWallet } from '@/lib/hyperliquidApi'
 
@@ -24,6 +25,7 @@ interface ExchangeWalletsPanelProps {
 interface ExchangeStatus {
   hyperliquid: { testnet: boolean; mainnet: boolean }
   binance: { testnet: boolean; mainnet: boolean }
+  okx: { testnet: boolean; mainnet: boolean }  // [OKX 新增]
 }
 
 // Connected icon (green link)
@@ -49,7 +51,8 @@ export default function ExchangeWalletsPanel({
   const [openSections, setOpenSections] = useState<string[]>([])
   const [status, setStatus] = useState<ExchangeStatus>({
     hyperliquid: { testnet: false, mainnet: false },
-    binance: { testnet: false, mainnet: false }
+    binance: { testnet: false, mainnet: false },
+    okx: { testnet: false, mainnet: false },  // [OKX 新增]
   })
 
   // Load all exchange statuses on mount
@@ -87,6 +90,23 @@ export default function ExchangeWalletsPanel({
       }
     } catch (error) {
       console.error('Failed to load Binance status:', error)
+    }
+
+    // [OKX 新增] 加载 OKX 状态
+    try {
+      const okxRes = await fetch(`/api/okx/accounts/${accountId}/config`)
+      if (okxRes.ok) {
+        const okxData = await okxRes.json()
+        setStatus(prev => ({
+          ...prev,
+          okx: {
+            testnet: okxData.testnet_configured,
+            mainnet: okxData.mainnet_configured
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('Failed to load OKX status:', error)
     }
   }
 
@@ -195,6 +215,7 @@ export default function ExchangeWalletsPanel({
       <div className="space-y-2">
         {renderExchangeSection('hyperliquid', 'Hyperliquid', status.hyperliquid, HyperliquidWalletSection)}
         {renderExchangeSection('binance', 'Binance Futures', status.binance, BinanceWalletSection)}
+        {renderExchangeSection('okx', 'OKX Perpetual', status.okx, OkxWalletSection)}  {/* [OKX 新增] */}
       </div>
     </div>
   )

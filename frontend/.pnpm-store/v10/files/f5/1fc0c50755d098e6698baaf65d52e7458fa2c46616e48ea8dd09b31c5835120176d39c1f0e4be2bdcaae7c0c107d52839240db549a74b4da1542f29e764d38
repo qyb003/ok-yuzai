@@ -1,0 +1,139 @@
+import { FC, PropsWithChildren } from "react";
+import { MessageClientApi, MessageClientState } from "../../client/types/Message";
+import { ThreadListItemClientApi, ThreadListItemClientState } from "../../client/types/ThreadListItem";
+import { MessagePartClientApi, MessagePartClientState } from "../../client/types/Part";
+import { ThreadClientApi, ThreadClientState } from "../../client/types/Thread";
+import { ComposerClientApi, ComposerClientState } from "../../client/types/Composer";
+import { AttachmentClientApi, AttachmentClientState } from "../../client/types/Attachment";
+import { Unsubscribe } from "../../types";
+import { AssistantEvent, AssistantEventCallback, AssistantEventSelector } from "../../types/EventTypes";
+import { ThreadListClientApi, ThreadListClientState } from "../../client/types/ThreadList";
+import { AssistantClientProps } from "../../client/AssistantClient";
+import { ToolsApi, ToolsMeta, ToolsState } from "../../client/types/Tools";
+import { ModelContextApi, ModelContextMeta } from "../../client/types/ModelContext";
+import { DerivedScopesInput } from "../../utils/tap-store/derived-scopes";
+export type AssistantState = {
+    readonly threads: ThreadListClientState;
+    readonly tools: ToolsState;
+    readonly threadListItem: ThreadListItemClientState;
+    readonly thread: ThreadClientState;
+    readonly composer: ComposerClientState;
+    readonly message: MessageClientState;
+    readonly part: MessagePartClientState;
+    readonly attachment: AttachmentClientState;
+};
+export type AssistantApiField<TApi, TMeta extends {
+    source: string | null;
+    query: any;
+}> = (() => TApi) & (TMeta | {
+    source: null;
+    query: Record<string, never>;
+});
+type ThreadsMeta = {
+    source: "root";
+    query: Record<string, never>;
+};
+type ThreadListItemMeta = {
+    source: "threads";
+    query: {
+        type: "index";
+        index: number;
+        archived: boolean;
+    } | {
+        type: "main";
+    } | {
+        type: "id";
+        id: string;
+    };
+};
+type ThreadMeta = {
+    source: "threads";
+    query: {
+        type: "main";
+    };
+};
+type ComposerMeta = {
+    source: "message" | "thread";
+    query: Record<string, never>;
+};
+type MessageMeta = {
+    source: "thread";
+    query: {
+        type: "index";
+        index: number;
+    };
+} | {
+    source: "root";
+    query: Record<string, never>;
+};
+type PartMeta = {
+    source: "message" | "root";
+    query: {
+        type: "index";
+        index: number;
+    } | Record<string, never>;
+};
+type AttachmentMeta = {
+    source: "message" | "composer";
+    query: {
+        type: "index";
+        index: number;
+    };
+};
+export type AssistantApi = {
+    threads: AssistantApiField<ThreadListClientApi, ThreadsMeta>;
+    tools: AssistantApiField<ToolsApi, ToolsMeta>;
+    modelContext: AssistantApiField<ModelContextApi, ModelContextMeta>;
+    threadListItem: AssistantApiField<ThreadListItemClientApi, ThreadListItemMeta>;
+    thread: AssistantApiField<ThreadClientApi, ThreadMeta>;
+    composer: AssistantApiField<ComposerClientApi, ComposerMeta>;
+    message: AssistantApiField<MessageClientApi, MessageMeta>;
+    part: AssistantApiField<MessagePartClientApi, PartMeta>;
+    attachment: AssistantApiField<AttachmentClientApi, AttachmentMeta>;
+    subscribe(listener: () => void): Unsubscribe;
+    flushSync(): void;
+    on<TEvent extends AssistantEvent>(event: AssistantEventSelector<TEvent>, callback: AssistantEventCallback<TEvent>): Unsubscribe;
+};
+export declare const createAssistantApiField: <TApi, TMeta extends {
+    source: any;
+    query: any;
+}>(config: {
+    get: () => TApi;
+} & (TMeta | {
+    source: null;
+    query: Record<string, never>;
+})) => AssistantApiField<TApi, TMeta>;
+export declare const useAssistantApiImpl: () => AssistantApi;
+/**
+ * Hook to extend the current AssistantApi with additional derived scope fields and special callbacks.
+ * This merges the derived fields with the existing API from context.
+ * Fields are automatically memoized based on source and query changes.
+ * Special callbacks (on, subscribe, flushSync) use the useEffectEvent pattern to always access latest values.
+ *
+ * @param scopes - Record of field names to DerivedScope resource elements, plus optional special callbacks
+ * @returns The merged AssistantApi
+ *
+ * @example
+ * ```tsx
+ * const api = useExtendedAssistantApi({
+ *   message: DerivedScope({
+ *     source: "root",
+ *     query: {},
+ *     get: () => messageApi,
+ *   }),
+ *   on: (selector, callback) => {
+ *     // Custom event filtering logic
+ *   },
+ * });
+ * ```
+ */
+export declare const useExtendedAssistantApi: (scopes: DerivedScopesInput) => AssistantApi;
+export declare function useAssistantApi(): AssistantApi;
+export declare function useAssistantApi(config: AssistantClientProps): AssistantApi;
+export declare const extendApi: (api: AssistantApi, api2: Partial<AssistantApi>) => AssistantApi;
+export declare const AssistantProvider: FC<PropsWithChildren<{
+    api: AssistantApi;
+    devToolsVisible?: boolean;
+}>>;
+export {};
+//# sourceMappingURL=AssistantApiContext.d.ts.map

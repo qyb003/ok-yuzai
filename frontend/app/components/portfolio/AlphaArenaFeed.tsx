@@ -49,7 +49,7 @@ interface AlphaArenaFeedProps {
   walletAddress?: string
   onPageChange?: (page: string) => void
   onSelectedSymbolChange?: (symbol: string | null) => void
-  onSelectedExchangeChange?: (exchange: 'all' | 'hyperliquid' | 'binance') => void
+  onSelectedExchangeChange?: (exchange: 'all' | 'hyperliquid' | 'binance' | 'okx') => void
   onArenaActivity?: (activity: {
     accountId: number
     exchange: string
@@ -145,7 +145,7 @@ export default function AlphaArenaFeed({
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null)
 
   // Exchange filter state
-  const [selectedExchange, setSelectedExchange] = useState<'all' | 'hyperliquid' | 'binance'>('all')
+  const [selectedExchange, setSelectedExchange] = useState<'all' | 'hyperliquid' | 'binance' | 'okx'>('all')
 
   // Feed-level filter states (shared by ModelChat and Program tabs)
   const [feedTimeRange, setFeedTimeRange] = useState<'all' | '3d' | '7d' | 'custom'>('all')
@@ -877,7 +877,7 @@ export default function AlphaArenaFeed({
     onSelectedSymbolChange?.(symbol)
   }
 
-  const handleExchangeFilterChange = (exchange: 'all' | 'hyperliquid' | 'binance') => {
+  const handleExchangeFilterChange = (exchange: 'all' | 'hyperliquid' | 'binance' | 'okx') => {
     setSelectedExchange(exchange)
     onSelectedExchangeChange?.(exchange)
     // Reload data with new exchange filter
@@ -1230,12 +1230,13 @@ export default function AlphaArenaFeed({
           </select>
           <select
             value={selectedExchange}
-            onChange={(e) => handleExchangeFilterChange(e.target.value as 'all' | 'hyperliquid' | 'binance')}
+            onChange={(e) => handleExchangeFilterChange(e.target.value as 'all' | 'hyperliquid' | 'binance' | 'okx')}
             className="h-8 rounded border border-border bg-muted px-2 text-xs uppercase tracking-wide text-foreground"
           >
             <option value="all">{t('feed.allExchanges', 'All Exchanges')}</option>
             <option value="hyperliquid">Hyperliquid</option>
             <option value="binance">Binance</option>
+            <option value="okx">OKX</option>
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -1496,12 +1497,12 @@ export default function AlphaArenaFeed({
                             </div>
                             <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-slate-800/80">
                               <img
-                                src={trade.exchange === 'binance' ? '/static/binance_logo.svg' : '/static/hyperliquid_logo.svg'}
-                                alt={trade.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                                src={trade.exchange === 'binance' ? '/static/binance_logo.svg' : trade.exchange === 'okx' ? '/static/okx_logo.svg' : '/static/hyperliquid_logo.svg'}
+                                alt={trade.exchange === 'binance' ? 'Binance' : trade.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                                 className="h-3.5 w-3.5"
                               />
                               <span className="text-[10px] font-medium text-slate-200">
-                                {trade.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                                {trade.exchange === 'binance' ? 'Binance' : trade.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                               </span>
                             </div>
                           </div>
@@ -1624,12 +1625,12 @@ export default function AlphaArenaFeed({
                           </div>
                           <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-slate-800/80">
                             <img
-                              src={entry.exchange === 'binance' ? '/static/binance_logo.svg' : '/static/hyperliquid_logo.svg'}
-                              alt={entry.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                              src={entry.exchange === 'binance' ? '/static/binance_logo.svg' : entry.exchange === 'okx' ? '/static/okx_logo.svg' : '/static/hyperliquid_logo.svg'}
+                              alt={entry.exchange === 'binance' ? 'Binance' : entry.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                               className="h-3.5 w-3.5"
                             />
                             <span className="text-[10px] font-medium text-slate-200">
-                              {entry.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                              {entry.exchange === 'binance' ? 'Binance' : entry.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                             </span>
                           </div>
                         </div>
@@ -1805,12 +1806,12 @@ export default function AlphaArenaFeed({
                             )}
                             <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-slate-800/80">
                               <img
-                                src={snapshot.exchange === 'binance' ? '/static/binance_logo.svg' : '/static/hyperliquid_logo.svg'}
-                                alt={snapshot.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                                src={snapshot.exchange === 'binance' ? '/static/binance_logo.svg' : snapshot.exchange === 'okx' ? '/static/okx_logo.svg' : '/static/hyperliquid_logo.svg'}
+                                alt={snapshot.exchange === 'binance' ? 'Binance' : snapshot.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                                 className="h-3.5 w-3.5"
                               />
                               <span className="text-[10px] font-medium text-slate-200">
-                                {snapshot.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                                {snapshot.exchange === 'binance' ? 'Binance' : snapshot.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                               </span>
                             </div>
                           </div>
@@ -2007,12 +2008,12 @@ export default function AlphaArenaFeed({
                           </div>
                           <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-slate-800/80">
                             <img
-                              src={log.exchange === 'binance' ? '/static/binance_logo.svg' : '/static/hyperliquid_logo.svg'}
-                              alt={log.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                              src={log.exchange === 'binance' ? '/static/binance_logo.svg' : log.exchange === 'okx' ? '/static/okx_logo.svg' : '/static/hyperliquid_logo.svg'}
+                              alt={log.exchange === 'binance' ? 'Binance' : log.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                               className="h-3.5 w-3.5"
                             />
                             <span className="text-[10px] font-medium text-slate-200">
-                              {log.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                              {log.exchange === 'binance' ? 'Binance' : log.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                             </span>
                           </div>
                         </div>

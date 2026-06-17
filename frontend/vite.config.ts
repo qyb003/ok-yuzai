@@ -19,15 +19,16 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 8802,
-    allowedHosts: true,  // Allow all hosts for flexible deployment
+    port: 5173,  // [DEV] Vite dev server 端口改为 5173（避免与后端 8802 冲突）
+    allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8802',
+        // [DEV] Docker 内用 app:8802，宿主机本地开发用 127.0.0.1:8802
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8802',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://127.0.0.1:8802',
+        target: (process.env.VITE_API_TARGET || 'http://127.0.0.1:8802').replace('http', 'ws'),
         changeOrigin: true,
         ws: true,
       },

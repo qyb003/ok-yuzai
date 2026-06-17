@@ -82,7 +82,7 @@ def _get_hyperliquid_positions(db: Session, account_id: Optional[int], environme
     Returns:
         Dict with generated_at, trading_mode, and accounts list
     """
-    from database.models import HyperliquidWallet
+    from database.models import HyperliquidWallet, BinanceWallet, OkxWallet  # [OKX]
 
     # Get all AI accounts or specific account (filter hidden accounts for Dashboard)
     accounts_query = db.query(Account).filter(
@@ -99,150 +99,166 @@ def _get_hyperliquid_positions(db: Session, account_id: Optional[int], environme
     snapshots = []
 
     for account in accounts:
-        # Check if wallet exists for this environment (multi-wallet architecture)
-        wallet = db.query(HyperliquidWallet).filter(
+        # [OKX 修复] 检查三种交易所的钱包配置
+        hl_wallet = db.query(HyperliquidWallet).filter(
             HyperliquidWallet.account_id == account.id,
             HyperliquidWallet.environment == environment,
             HyperliquidWallet.is_active == "true"
         ).first()
+        bn_wallet = db.query(BinanceWallet).filter(
+            BinanceWallet.account_id == account.id,
+            BinanceWallet.environment == environment,
+            BinanceWallet.is_active == "true"
+        ).first()
+        okx_wallet = db.query(OkxWallet).filter(
+            OkxWallet.account_id == account.id,
+            OkxWallet.environment == environment,
+            OkxWallet.is_active == "true"
+        ).first()
 
-        if not wallet:
-            logger.debug(f"Account {account.name} (ID: {account.id}) has no {environment} wallet configured, skipping")
-            continue
+        # 处理 Hyperliquid 钱包的账户快照
+        if hl_wallet:
+            _append_hl_snapshot(db, account, environment, hl_wallet, snapshots)
+        # [OKX] 处理 OKX 钱包的账户快照
+        if okx_wallet:
+            _append_okx_snapshot(db, account, environment, okx_wallet, snapshots)
+        # 币安钱包的账户快照
+        if bn_wallet:
+            _append_bn_snapshot(db, account, environment, bn_wallet, snapshots)
 
-        encrypted_key = wallet.private_key_encrypted
-
-        try:
-            cached_state = get_cached_account_state(account.id, environment)
-            account_state = cached_state["data"] if cached_state else None
-
-            cached_positions = get_cached_positions(account.id, environment)
-            positions_data = cached_positions["data"] if cached_positions else None
-
-            wallet_address = None
-            if isinstance(account_state, dict):
-                wallet_address = account_state.get("wallet_address")
-
-            client: Optional[HyperliquidTradingClient] = None
-            needs_state = account_state is None
-            needs_positions = positions_data is None
-            needs_wallet = wallet_address is None
-
-            if needs_state or needs_positions or needs_wallet:
-                # Use get_hyperliquid_client to support API Wallet mode
-                client = get_hyperliquid_client(
-                    db, account.id, override_environment=environment
-                )
-
-                if needs_state:
-                    account_state = client.get_account_state(db)
-                    wallet_address = account_state.get("wallet_address") or client.wallet_address
-                if needs_positions:
-                    positions_data = client.get_positions(db)
-                if wallet_address is None:
-                    wallet_address = client.wallet_address
-
-            if account_state is None or positions_data is None:
-                logger.warning(f"Account {account.id} has no Hyperliquid data available, skipping")
-                continue
-
-            # Transform Hyperliquid positions to frontend format
-            position_items = []
-            total_unrealized = 0.0
-
-            for p in positions_data:
-                unrealized_pnl = p.get("unrealized_pnl", 0)
-                total_unrealized += unrealized_pnl
-
-                szi = float(p.get("szi", 0) or 0)
-                entry_px = float(p.get("entry_px", 0) or 0)
-                position_value = float(p.get("position_value", 0) or 0)
-                notional = abs(szi) * entry_px
-                avg_cost = entry_px
-                current_price = position_value / abs(szi) if szi != 0 else entry_px
-
-                position_items.append({
-                    "id": 0,  # Hyperliquid positions don't have local DB ID
-                    "symbol": p.get("coin", "") or "",
-                    "name": p.get("coin", "") or "",
-                    "market": "HYPERLIQUID_PERP",
-                    "side": "LONG" if szi > 0 else "SHORT",
-                    "quantity": abs(szi),
-                    "avg_cost": avg_cost,
-                    "current_price": current_price,
-                    "notional": notional,
-                    "current_value": position_value,
-                    "unrealized_pnl": float(unrealized_pnl),
-                    "leverage": p.get("leverage"),
-                    "margin_used": float(p.get("margin_used", 0) or 0),
-                    "return_on_equity": float(p.get("return_on_equity", 0) or 0),
-                    "percentage": float(p.get("percentage", 0) or 0),
-                    "margin_mode": p.get("margin_mode", "cross"),
-                    "liquidation_px": float(p.get("liquidation_px", 0) or 0),
-                    "max_leverage": p.get("max_leverage"),
-                    "leverage_type": p.get("leverage_type"),
-                })
-
-            # Calculate total return
-            total_equity = account_state.get("total_equity", 0)
-            available_balance = account_state.get("available_balance", 0)
-            used_margin = account_state.get("used_margin", 0)
-
-            # Positions value is the used margin (capital tied up in positions)
-            # Or equivalently: total_equity - available_balance
-            positions_value = used_margin
-
-            initial_capital = float(account.initial_capital or 0)
-            total_return = None
-            if initial_capital > 0:
-                total_return = (total_equity - initial_capital) / initial_capital
-
-            snapshots.append({
-                "account_id": account.id,
-                "account_name": account.name,
-                "model": account.model,
-                "environment": environment,
-                "exchange": "hyperliquid",
-                "wallet_address": wallet_address,
-                "total_unrealized_pnl": total_unrealized,
-                "available_cash": available_balance,
-                "used_margin": used_margin,
-                "positions_value": positions_value,  # Add positions_value from Hyperliquid data
-                "positions": position_items,
-                "total_assets": total_equity,
-                "margin_usage_percent": account_state.get("margin_usage_percent", 0),
-                "margin_mode": "cross",
-                "initial_capital": initial_capital,
-                "total_return": total_return,
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to get Hyperliquid positions for account {account.id}: {e}", exc_info=True)
-            # Fallback: still expose the account so frontend doesn't think it's missing
-            snapshots.append({
-                "account_id": account.id,
-                "account_name": account.name,
-                "model": account.model,
-                "environment": environment,
-                "wallet_address": wallet.wallet_address if 'wallet' in locals() and wallet else None,
-                "total_unrealized_pnl": 0.0,
-                "available_cash": 0.0,
-                "used_margin": 0.0,
-                "positions_value": 0.0,
-                "positions": [],
-                "total_assets": float(account.initial_capital or 0),
-                "margin_usage_percent": 0.0,
-                "margin_mode": "cross",
-                "initial_capital": float(account.initial_capital or 0),
-                "total_return": 0.0,
-            })
-            continue
+        if not (hl_wallet or bn_wallet or okx_wallet):
+            logger.debug(f"Account {account.name} has no {environment} wallet, skipping")
 
     return {
         "generated_at": datetime.utcnow().isoformat(),
         "trading_mode": environment,
         "accounts": snapshots,
     }
+
+# [OKX 新增] OKX 钱包数据面板快照
+def _append_okx_snapshot(db, account, environment, wallet, snapshots):
+    from services.okx_environment import get_okx_client
+    try:
+        client = get_okx_client(db, account.id, override_environment=environment)
+        account_state = client.get_account_state(db)
+        positions_data = client.get_positions(db)
+    except Exception as e:
+        logger.warning(f"[OKX] Snapshot failed for {account.name}: {e}")
+        return
+    position_items = []
+    total_unrealized = 0.0
+    for p in positions_data:
+        unrealized_pnl = p.get("unrealized_pnl", 0)
+        total_unrealized += unrealized_pnl
+        szi = float(p.get("szi", 0) or 0)
+        position_items.append({
+            "id": 0, "symbol": p.get("coin","") or "", "name": p.get("coin","") or "",
+            "market": "OKX_PERP", "side": "LONG" if szi > 0 else "SHORT",
+            "quantity": abs(szi), "avg_cost": float(p.get("entry_px",0) or 0),
+            "current_price": float(p.get("mark_price",0) or 0),
+            "position_value": float(p.get("position_value",0) or 0),
+            "unrealized_pnl": float(unrealized_pnl),
+            "leverage": p.get("leverage"), "margin_used": float(p.get("margin_used",0) or 0),
+            "leverage_type": p.get("leverage_type"),
+        })
+    total_equity = account_state.get("total_equity", 0)
+    initial_capital = float(account.initial_capital or 0)
+    total_return = (total_equity - initial_capital) / initial_capital if initial_capital > 0 else None
+    snapshots.append({
+        "account_id": account.id, "account_name": account.name, "model": account.model,
+        "environment": environment, "exchange": "okx",
+        "wallet_address": f"okx_{account.id}",
+        "total_unrealized_pnl": total_unrealized, "available_cash": account_state.get("available_balance", 0),
+        "total_equity": total_equity, "used_margin": account_state.get("used_margin", 0),
+        "positions_value": account_state.get("used_margin", 0), "total_return": total_return,
+        "initial_capital": initial_capital, "positions": position_items,
+        "total_assets": total_equity, "source": "live",
+    })
+    logger.info(f"[OKX] Dashboard snapshot: equity={total_equity:.2f}, positions={len(position_items)}")
+
+# [OKX 新增] HL/BN 数据面板快照辅助函数
+def _append_hl_snapshot(db, account, environment, wallet, snapshots):
+    from services.hyperliquid_environment import get_hyperliquid_client
+    try:
+        client = get_hyperliquid_client(db, account.id, override_environment=environment)
+        account_state = client.get_account_state(db)
+        wallet_address = account_state.get("wallet_address") or client.wallet_address
+        positions_data = client.get_positions(db)
+    except Exception as e:
+        logger.error(f"HL Snapshot failed for {account.name}: {e}")
+        return
+    position_items = []
+    total_unrealized = 0.0
+    for p in positions_data:
+        unrealized_pnl = p.get("unrealized_pnl", 0)
+        total_unrealized += unrealized_pnl
+        szi = float(p.get("szi", 0) or 0)
+        entry_px = float(p.get("entry_px", 0) or 0)
+        position_value = float(p.get("position_value", 0) or 0)
+        position_items.append({
+            "id": 0, "symbol": p.get("coin","") or "", "name": p.get("coin","") or "",
+            "market": "HYPERLIQUID_PERP", "side": "LONG" if szi > 0 else "SHORT",
+            "quantity": abs(szi), "avg_cost": entry_px,
+            "current_price": position_value/abs(szi) if szi!=0 else entry_px,
+            "notional": abs(szi)*entry_px, "current_value": position_value,
+            "unrealized_pnl": float(unrealized_pnl),
+            "leverage": p.get("leverage"), "margin_used": float(p.get("margin_used",0) or 0),
+            "leverage_type": p.get("leverage_type"), "liquidation_px": float(p.get("liquidation_px",0) or 0),
+        })
+    total_equity = account_state.get("total_equity", 0)
+    initial_capital = float(account.initial_capital or 0)
+    total_return = (total_equity-initial_capital)/initial_capital if initial_capital>0 else None
+    snapshots.append({
+        "account_id": account.id, "account_name": account.name, "model": account.model,
+        "environment": environment, "exchange": "hyperliquid", "wallet_address": wallet_address,
+        "total_unrealized_pnl": total_unrealized,
+        "available_cash": account_state.get("available_balance",0),
+        "total_equity": total_equity, "used_margin": account_state.get("used_margin",0),
+        "positions_value": account_state.get("used_margin",0), "total_return": total_return,
+        "initial_capital": initial_capital, "positions": position_items,
+        "total_assets": total_equity, "source": "live",
+    })
+
+def _append_bn_snapshot(db, account, environment, wallet, snapshots):
+    from services.binance_trading_client import BinanceTradingClient
+    from utils.encryption import decrypt_private_key
+    try:
+        api_key = decrypt_private_key(wallet.api_key_encrypted)
+        secret_key = decrypt_private_key(wallet.secret_key_encrypted)
+        client = BinanceTradingClient(api_key, secret_key, environment)
+        account_state = client.get_account_state(db)
+        positions_data = client.get_positions(db)
+    except Exception as e:
+        return
+    position_items = []
+    total_unrealized = 0.0
+    for p in positions_data:
+        unrealized_pnl = p.get("unrealized_pnl", 0)
+        total_unrealized += unrealized_pnl
+        szi = float(p.get("szi", 0) or 0)
+        position_items.append({
+            "id": 0, "symbol": p.get("coin","") or "", "name": p.get("coin","") or "",
+            "market": "BINANCE_PERP", "side": "LONG" if szi>0 else "SHORT",
+            "quantity": abs(szi), "avg_cost": float(p.get("entry_px",0) or 0),
+            "current_price": float(p.get("mark_price",0) or 0),
+            "position_value": float(p.get("position_value",0) or 0),
+            "unrealized_pnl": float(unrealized_pnl),
+            "leverage": p.get("leverage"), "margin_used": float(p.get("margin_used",0) or 0),
+        })
+    total_equity = account_state.get("total_equity", 0)
+    initial_capital = float(account.initial_capital or 0)
+    total_return = (total_equity-initial_capital)/initial_capital if initial_capital>0 else None
+    snapshots.append({
+        "account_id": account.id, "account_name": account.name, "model": account.model,
+        "environment": environment, "exchange": "binance",
+        "wallet_address": f"binance_{account.id}",
+        "total_unrealized_pnl": total_unrealized,
+        "available_cash": account_state.get("available_balance",0),
+        "total_equity": total_equity, "used_margin": account_state.get("used_margin",0),
+        "positions_value": account_state.get("used_margin",0), "total_return": total_return,
+        "initial_capital": initial_capital, "positions": position_items,
+        "total_assets": total_equity, "source": "live",
+    })
 
 
 def _get_binance_positions(db: Session, account_id: Optional[int], environment: str) -> list:
@@ -549,7 +565,7 @@ def get_completed_trades(
     trading_mode: Optional[str] = Query(None, regex="^(paper|testnet|mainnet)$"),
     wallet_address: Optional[str] = Query(None),
     symbol: Optional[str] = Query(None),
-    exchange: Optional[str] = Query(None, regex="^(hyperliquid|binance)$"),
+    exchange: Optional[str] = Query(None, regex="^(hyperliquid|binance|okx)$"),
     db: Session = Depends(get_db),
 ):
     """Return recent trades across all AI accounts, filtered by trading mode."""
@@ -990,7 +1006,7 @@ def get_model_chat(
     include_snapshots: bool = Query(False, description="Include prompt/reasoning/decision snapshots (heavy data)"),
     symbol: Optional[str] = Query(None),
     ids: Optional[str] = Query(None, description="Comma-separated list of decision IDs to fetch"),
-    exchange: Optional[str] = Query(None, regex="^(hyperliquid|binance)$"),
+    exchange: Optional[str] = Query(None, regex="^(hyperliquid|binance|okx)$"),
     db: Session = Depends(get_db),
 ):
     """Return recent AI decision logs as chat-style summaries, filtered by trading mode."""
@@ -1453,6 +1469,7 @@ def update_pnl_data(db: Session = Depends(get_db)):
     from database.models import (
         HyperliquidWallet,
         BinanceWallet,
+        OkxWallet,  # [OKX]
         AccountPromptBinding,
         AIDecisionLog,
         ProgramExecutionLog,
@@ -1466,6 +1483,7 @@ def update_pnl_data(db: Session = Depends(get_db)):
         "success": True,
         "hyperliquid": {},
         "binance": {},
+        "okx": {},  # [OKX]
         "errors": [],
     }
 
@@ -1605,6 +1623,11 @@ def update_pnl_data(db: Session = Depends(get_db)):
     finally:
         snapshot_db.close()
 
+    # [OKX 新增] OKX 钱包 PnL 数据同步（占位，数据采集器负责实际数据入库）
+    # OKX 的成交数据由 okx_collector 采集后存入数据库，
+    # PnL 同步通过 okx_snapshot_service 定期获取账户快照实现。
+    # 此处仅标记 OKX 已被纳入 PnL 更新流程。
+
     return result
 
 
@@ -1625,7 +1648,7 @@ def _process_fills_for_environment(
     3. Updates AIDecisionLog/ProgramExecutionLog.realized_pnl for closed positions
 
     Args:
-        exchange: "hyperliquid" or "binance" - determines which wallet to use for API calls
+        exchange: "hyperliquid", "binance", or "okx" - determines which wallet to use for API calls  # [OKX]
 
     Returns summary of updates.
     """

@@ -278,6 +278,10 @@ class StrategyManager:
             if exchange == "binance":
                 from services.trading_commands import place_ai_driven_binance_order
                 place_ai_driven_binance_order(account_id=account_id, trigger_context=trigger_context)
+            # [OKX 新增] OKX AI 自动交易
+            elif exchange == "okx":
+                from services.trading_commands import place_ai_driven_okx_order
+                place_ai_driven_okx_order(account_id=account_id, trigger_context=trigger_context)
             else:
                 # Default to Hyperliquid
                 from services.trading_commands import place_ai_driven_hyperliquid_order

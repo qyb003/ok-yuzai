@@ -1,0 +1,142 @@
+"use client";
+
+// src/client/ThreadMessageClient.tsx
+import {
+  resource,
+  tapMemo,
+  tapState,
+  tapInlineResource
+} from "@assistant-ui/tap";
+import { tapLookupResources } from "./util-hooks/tapLookupResources.js";
+import { tapApi } from "../utils/tap-store/index.js";
+import { NoOpComposerClient } from "./NoOpComposerClient.js";
+var ThreadMessagePartClient = resource(
+  ({ part }) => {
+    const state = tapMemo(() => {
+      return {
+        ...part,
+        status: { type: "complete" }
+      };
+    }, [part]);
+    return tapApi(
+      {
+        getState: () => state,
+        addToolResult: () => {
+          throw new Error("Not supported");
+        },
+        resumeToolCall: () => {
+          throw new Error("Not supported");
+        }
+      },
+      {
+        key: state.type === "tool-call" ? "toolCallId-" + state.toolCallId : void 0
+      }
+    );
+  }
+);
+var ThreadMessageAttachmentClient = resource(
+  ({ attachment }) => {
+    return tapApi(
+      {
+        getState: () => attachment,
+        remove: () => {
+          throw new Error("Not supported");
+        }
+      },
+      {
+        key: attachment.id
+      }
+    );
+  }
+);
+var ThreadMessageClient = resource(
+  ({
+    message,
+    index,
+    isLast = true,
+    branchNumber = 1,
+    branchCount = 1
+  }) => {
+    const [isCopiedState, setIsCopied] = tapState(false);
+    const [isHoveringState, setIsHovering] = tapState(false);
+    const parts = tapLookupResources(
+      message.content.map(
+        (_, idx) => ThreadMessagePartClient({ part: message.content[idx] }, { key: idx })
+      )
+    );
+    const attachments = tapLookupResources(
+      message.attachments?.map(
+        (_, idx) => ThreadMessageAttachmentClient(
+          { attachment: message.attachments[idx] },
+          { key: idx }
+        )
+      ) ?? []
+    );
+    const composerState = tapInlineResource(
+      NoOpComposerClient({ type: "edit" })
+    );
+    const state = tapMemo(() => {
+      return {
+        ...message,
+        parts: parts.state,
+        composer: composerState.state,
+        parentId: null,
+        index,
+        isLast,
+        branchNumber,
+        branchCount,
+        speech: void 0,
+        submittedFeedback: message.metadata.submittedFeedback,
+        isCopied: isCopiedState,
+        isHovering: isHoveringState
+      };
+    }, [message, index, isCopiedState, isHoveringState, isLast]);
+    return tapApi({
+      getState: () => state,
+      composer: composerState.api,
+      part: (selector) => {
+        if ("index" in selector) {
+          return parts.api({ index: selector.index });
+        } else {
+          return parts.api({ key: "toolCallId-" + selector.toolCallId });
+        }
+      },
+      attachment: (selector) => {
+        if ("id" in selector) {
+          return attachments.api({ key: selector.id });
+        } else {
+          return attachments.api(selector);
+        }
+      },
+      reload: () => {
+        throw new Error("Not supported in ThreadMessageProvider");
+      },
+      speak: () => {
+        throw new Error("Not supported in ThreadMessageProvider");
+      },
+      stopSpeaking: () => {
+        throw new Error("Not supported in ThreadMessageProvider");
+      },
+      submitFeedback: () => {
+        throw new Error("Not supported in ThreadMessageProvider");
+      },
+      switchToBranch: () => {
+        throw new Error("Not supported in ThreadMessageProvider");
+      },
+      getCopyText: () => {
+        return message.content.map((part) => {
+          if ("text" in part && typeof part.text === "string") {
+            return part.text;
+          }
+          return "";
+        }).join("\n");
+      },
+      setIsCopied,
+      setIsHovering
+    });
+  }
+);
+export {
+  ThreadMessageClient
+};
+//# sourceMappingURL=ThreadMessageClient.js.map

@@ -1,5 +1,6 @@
 from typing import Dict, List, Any
 import logging
+from services.exchanges.symbol_mapper import SymbolMapper  # [OKX] K-line debug needs this
 from .hyperliquid_market_data import (
     get_last_price_from_hyperliquid,
     get_kline_data_from_hyperliquid,
@@ -23,6 +24,19 @@ def get_last_price(symbol: str, market: str = "CRYPTO", environment: str = "main
         return cached_price
 
     logger.info(f"Getting real-time price for {key} from API ({environment})...")
+
+    # [OKX 新增] OKX 价格获取
+    if market.lower() == "okx":
+        try:
+            from services.exchanges.okx_adapter import OkxAdapter
+            adapter = OkxAdapter(environment=environment)
+            price = adapter.fetch_price(symbol)
+            logger.info(f"Got real-time price for {key} from OKX ({environment}): {price}")
+            cache_price(symbol, market, price, environment)
+            return price
+        except Exception as okx_err:
+            logger.error(f"Failed to get price from OKX ({environment}): {okx_err}")
+            raise Exception(f"Unable to get real-time price for {key}: {okx_err}")
 
     if market.lower() == "binance":
         try:
@@ -77,17 +91,50 @@ def get_kline_data(symbol: str, market: str = "CRYPTO", period: str = "1d", coun
                 })
 
             if data:
+                logger.warning(f"[OKX KLINE DEBUG] Got {len(data)} bars for {symbol}/{period}: first={data[0]}")
                 logger.info(f"Got K-line data for {key} from Binance ({environment}), total {len(data)} items")
                 return data
             raise Exception("Binance returned empty K-line data")
         except Exception as bn_err:
             logger.error(f"Failed to get K-line data from Binance ({environment}): {bn_err}")
             raise Exception(f"Unable to get K-line data for {key}: {bn_err}")
+    # [OKX 新增] OKX K线获取
+    elif market.lower() == "okx":
+        try:
+            from services.exchanges.okx_adapter import OkxAdapter
+            from datetime import datetime
+
+            adapter = OkxAdapter(environment=environment)
+            logger.warning(f"[OKX KLINE DEBUG] Fetching {symbol}/{period} limit={count} instId={SymbolMapper.to_exchange(symbol, 'okx')}")
+            unified_klines = adapter.fetch_klines(symbol, period, limit=count)
+            data = []
+            for kline in unified_klines:
+                data.append({
+                    'timestamp': kline.timestamp,
+                    'datetime': datetime.fromtimestamp(kline.timestamp),
+                    'open': float(kline.open_price),
+                    'high': float(kline.high_price),
+                    'low': float(kline.low_price),
+                    'close': float(kline.close_price),
+                    'volume': float(kline.volume),
+                    'amount': float(kline.quote_volume),
+                    'chg': None,
+                    'percent': None
+                })
+            if data:
+                logger.warning(f"[OKX KLINE DEBUG] Got {len(data)} bars for {symbol}/{period}: first={data[0]}")
+                logger.info(f"Got K-line data for {key} from OKX ({environment}), total {len(data)} items")
+                return data
+            raise Exception("OKX returned empty K-line data")
+        except Exception as okx_err:
+            logger.error(f"Failed to get K-line data from OKX ({environment}): {okx_err}")
+            raise Exception(f"Unable to get K-line data for {key}: {okx_err}")
     else:
         # Default to Hyperliquid
         try:
             data = get_kline_data_from_hyperliquid(symbol, period, count, persist=persist, environment=environment)
             if data:
+                logger.warning(f"[OKX KLINE DEBUG] Got {len(data)} bars for {symbol}/{period}: first={data[0]}")
                 logger.info(f"Got K-line data for {key} from Hyperliquid ({environment}), total {len(data)} items")
                 return data
             raise Exception("Hyperliquid returned empty K-line data")

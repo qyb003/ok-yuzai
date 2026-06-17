@@ -43,56 +43,69 @@ services:
       FACTOR_ENGINE_ENABLED: "true"
       # Hyper Insight login-based integration
       HYPER_INSIGHT_API_BASE_URL: ${HYPER_INSIGHT_API_BASE_URL:-https://hyper.akooi.com}
-      # Explicitly disable all proxy settings in container
+      # ===== 网络代理配置 =====
+      # 如果主机使用代理/VPN访问外网，请取消下面注释并填入代理地址
+      # HTTP_PROXY: "http://127.0.0.1:7890"
+      # HTTPS_PROXY: "http://127.0.0.1:7890"
+      # http_proxy: "http://127.0.0.1:7890"
+      # https_proxy: "http://127.0.0.1:7890"
+      # ALL_PROXY: "http://127.0.0.1:7890"
+      # ===== 不使用代理时，DNS 走公共服务器 =====
+      # 暂时留空（保持原行为），可改成你的代理地址后取消注释
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       http_proxy: ""
       https_proxy: ""
       ALL_PROXY: ""
-      NO_PROXY: ""
-      no_proxy: ""
+      NO_PROXY: "localhost,127.0.0.1,postgres"
+      no_proxy: "localhost,127.0.0.1,postgres"
+      # ===== DNS 配置（绕过 DNS 污染） =====
+      # 如 DNS 被劫持，使用自定义 DNS
+      # 取消下面注释可强制使用公共 DNS
+      # (Docker daemon 级配置，见下方说明)
     ports:
       - "127.0.0.1:8802:8802"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      # ========== Selective Backend Mounts for Hot Reload ==========
-      # Mount individual directories and files to enable hot reload while preserving
-      # the built frontend static files in the container image.
-      #
-      # IMPORTANT: Do NOT mount ./backend:/app/backend as it will override the
-      # /app/backend/static directory that contains the built frontend files,
-      # causing "Frontend not built yet" errors.
-      #
-      # If you add new directories or important Python files under backend/,
-      # remember to add corresponding volume mounts here to enable hot reload.
+      # ===== 完整挂载整个 backend 目录（改代码即时生效，无需重建镜像） =====
+      # 前端静态文件也通过此挂载同步（./backend/static 需预先放入构建产物）
+      - ./backend:/app/backend
 
-      # Backend subdirectories
-      - ./backend/api:/app/backend/api
-      - ./backend/backtest:/app/backend/backtest
-      - ./backend/config:/app/backend/config
-      - ./backend/database:/app/backend/database
-      - ./backend/factors:/app/backend/factors
-      - ./backend/program_trader:/app/backend/program_trader
-      - ./backend/repositories:/app/backend/repositories
-      - ./backend/routes:/app/backend/routes
-      - ./backend/schemas:/app/backend/schemas
-      - ./backend/services:/app/backend/services
-      - ./backend/utils:/app/backend/utils
-
-      # Backend root files (frequently modified during development)
-      - ./backend/main.py:/app/backend/main.py
-      - ./backend/models.py:/app/backend/models.py
-
-      # DO NOT mount ./backend/static - it must remain from the Docker image build
       # ===============================================================
+      # ==== 以下为数据持久化挂载（不包含代码） ====
 
       # Mount logs
       - ./logs:/app/logs
       # Mount data for encryption key persistence
       - app_data:/app/data
+    # ===== 热重载启动命令 =====
+    # 覆盖 Dockerfile CMD，添加 --reload 使 Python 代码修改即时生效
+    # 生产模式：删除整个 command 块，恢复使用 Dockerfile 中的 CMD
+    command: >
+      sh -c "mkdir -p /app/data &&
+      if [ ! -f /app/data/.encryption_key ]; then
+        python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())' > /app/data/.encryption_key;
+      fi &&
+      export HYPERLIQUID_ENCRYPTION_KEY=$$(cat /app/data/.encryption_key) &&
+      python -m database.init_postgresql || true &&
+      python database/init_hyperliquid_tables.py || true &&
+      python database/init_snapshot_db.py || true &&
+      python database/migration_manager.py || true &&
+      python -m uvicorn main:app --host 0.0.0.0 --port 8802 --reload --reload-dir /app/backend"
+
     restart: unless-stopped
+    # ===== 自定义 DNS（绕过 DNS 污染） =====
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+      - 114.114.114.114
+    # ===== /etc/hosts 硬编码（绕过 DNS 劫持） =====
+    # OKX 和 Binance 的真实 IP（通过海外 VPS 解析获取，如失效请更新）
+    extra_hosts:
+      - "www.okx.com:104.18.38.174"
+      - "fapi.binance.com:52.84.150.81"
 
 volumes:
   postgres_data:

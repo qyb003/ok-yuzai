@@ -199,7 +199,7 @@ async def set_exchange_config(exchange_data: dict, db: Session = Depends(get_db)
     """Set exchange configuration for default user"""
     try:
         selected_exchange = exchange_data.get("selected_exchange")
-        if not selected_exchange or selected_exchange not in ["hyperliquid", "binance", "aster"]:
+        if not selected_exchange or selected_exchange not in ["hyperliquid", "binance", "aster", "okx"]:  # [OKX 新增]
             raise HTTPException(status_code=400, detail="Invalid exchange selection")
 
         # Use default user_id=1 for now

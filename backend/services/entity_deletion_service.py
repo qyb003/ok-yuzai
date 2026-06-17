@@ -80,7 +80,7 @@ def delete_trader(db: Session, trader_id: int) -> Dict[str, Any]:
 
     Also soft-deletes associated wallet configurations.
     """
-    from database.models import Account, HyperliquidWallet, BinanceWallet
+    from database.models import Account, HyperliquidWallet, BinanceWallet, OkxWallet  # [OKX]
 
     account = db.query(Account).filter(
         Account.id == trader_id,
@@ -104,7 +104,7 @@ def delete_trader(db: Session, trader_id: int) -> Dict[str, Any]:
 
     # Soft-delete associated wallets
     wallets_deleted = 0
-    for WalletModel in [HyperliquidWallet, BinanceWallet]:
+    for WalletModel in [HyperliquidWallet, BinanceWallet, OkxWallet]:  # [OKX]
         wallets = db.query(WalletModel).filter(
             WalletModel.account_id == trader_id
         ).all()

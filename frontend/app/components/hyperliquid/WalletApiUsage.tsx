@@ -62,6 +62,27 @@ export default function WalletApiUsage({ accountId, environment, exchange = 'hyp
         } else {
           toast.error('Failed to fetch rate limit data');
         }
+      // [OKX 修复] OKX rate limit — 通过 balance 接口间接获取状态
+      } else if (exchange === 'okx') {
+        try {
+          const res = await fetch(`/api/okx/accounts/${accountId}/balance?environment=${environment}`)
+          if (res.ok) {
+            const data = await res.json()
+            const bal = data.balance || {}
+            const dataWithTimestamp: RateLimitData = {
+              used_weight: bal.used_margin ?? 0,
+              weight_cap: bal.total_equity ?? 0,
+              remaining: bal.available_balance ?? 0,
+              usagePercent: bal.margin_usage_percent ?? 0,
+              isOverLimit: (bal.margin_usage_percent ?? 0) >= 100,
+              environment,
+              timestamp: Date.now(),
+            };
+            setRateLimit(dataWithTimestamp);
+            setLastUpdateTime(new Date());
+            localStorage.setItem(getCacheKey(), JSON.stringify(dataWithTimestamp));
+          }
+        } catch (e) { console.error('OKX rate limit failed:', e) }
       } else {
         const response = await getBinanceRateLimit(accountId);
         if (response.success && response.rate_limit) {

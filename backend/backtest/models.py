@@ -30,7 +30,7 @@ class BacktestConfig:
     execution_price: str = "close"         # "close", "open", "vwap"
 
     # Exchange for data source
-    exchange: str = "hyperliquid"          # "hyperliquid" or "binance"
+    exchange: str = "hyperliquid"          # "hyperliquid", "binance", or "okx"
 
     @property
     def start_time(self) -> datetime:

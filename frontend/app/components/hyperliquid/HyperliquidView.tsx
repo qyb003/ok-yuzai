@@ -22,7 +22,7 @@ import HyperliquidMultiAccountSummary from '@/components/portfolio/HyperliquidMu
 import HyperliquidAssetChart, { TradeMarker } from './HyperliquidAssetChart'
 import ArenaView from '@/components/arena/ArenaView'
 import ViewToggle, { type ViewMode, getStoredViewMode } from '@/components/arena/ViewToggle'
-import DashboardInsightView from './DashboardInsightView'
+import DashboardInsightView from './DashBoardInsightView'  // fix case for Linux build
 
 interface HyperliquidViewProps {
   wsRef?: React.MutableRefObject<WebSocket | null>

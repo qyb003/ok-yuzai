@@ -1,0 +1,9 @@
+import { ReadonlyJSONArray, ReadonlyJSONObject, ReadonlyJSONValue } from "./json-value.js";
+
+//#region src/utils/json/is-json.d.ts
+declare function isJSONValue(value: unknown): value is ReadonlyJSONValue;
+declare function isJSONArray(value: unknown): value is ReadonlyJSONArray;
+declare function isJSONObject(value: unknown): value is ReadonlyJSONObject;
+//#endregion
+export { isJSONArray, isJSONObject, isJSONValue };
+//# sourceMappingURL=is-json.d.ts.map

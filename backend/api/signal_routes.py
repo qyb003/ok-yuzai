@@ -423,7 +423,7 @@ def analyze_metric(
     metric: str = Query(..., description="Metric type (e.g., oi_delta_percent)"),
     period: str = Query("5m", description="Time period (e.g., 5m, 15m)"),
     days: int = Query(7, le=30, description="Days of history to analyze"),
-    exchange: str = Query("hyperliquid", description="Exchange (hyperliquid or binance)"),
+    exchange: str = Query("hyperliquid", description="Exchange (hyperliquid, binance, or okx)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -474,7 +474,7 @@ class TempBacktestRequest(BaseModel):
     trigger_condition: dict = Field(..., alias="triggerCondition", description="Signal trigger condition")
     kline_min_ts: Optional[int] = Field(None, alias="klineMinTs", description="Min K-line timestamp in ms")
     kline_max_ts: Optional[int] = Field(None, alias="klineMaxTs", description="Max K-line timestamp in ms")
-    exchange: str = Field("hyperliquid", description="Exchange (hyperliquid or binance)")
+    exchange: str = Field("hyperliquid", description="Exchange (hyperliquid, binance, or okx)")
 
     class Config:
         populate_by_name = True
@@ -988,7 +988,7 @@ class SignalPoolConfigRequest(BaseModel):
     description: Optional[str] = Field(None, description="Pool description")
     logic: str = Field("AND", description="Combination logic: AND or OR")
     signals: List[dict] = Field(..., description="List of signal configurations")
-    exchange: str = Field("hyperliquid", description="Exchange: hyperliquid or binance")
+    exchange: str = Field("hyperliquid", description="Exchange: hyperliquid, binance, or okx")
 
     class Config:
         populate_by_name = True

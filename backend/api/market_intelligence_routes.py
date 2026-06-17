@@ -208,7 +208,7 @@ async def stream_market_intelligence(
     request: Request,
     symbol: str = Query("BTC", description="Trading symbol, e.g. BTC"),
     symbols: Optional[str] = Query(None, description="Comma-separated symbols, e.g. BTC,ETH,SOL"),
-    exchange: str = Query("hyperliquid", description="Exchange: hyperliquid or binance"),
+    exchange: str = Query("hyperliquid", description="Exchange: hyperliquid, binance, or okx"),
     timeframe: str = Query("15m", description="Chart timeframe"),
     window: str = Query("4h", description="Analysis window"),
 ):
@@ -216,7 +216,7 @@ async def stream_market_intelligence(
         return StreamingResponse(iter(["event: error\ndata: {\"message\":\"invalid timeframe\"}\n\n"]), media_type="text/event-stream")
     if window != "4h":
         window = "4h"
-    if exchange.lower() not in {"hyperliquid", "binance"}:
+    if exchange.lower() not in {"hyperliquid", "binance", "okx"}:  # [OKX 新增]
         return StreamingResponse(iter(["event: error\ndata: {\"message\":\"invalid exchange\"}\n\n"]), media_type="text/event-stream")
 
     # Parse multi-symbol list

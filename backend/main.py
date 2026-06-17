@@ -725,6 +725,7 @@ from api.trader_data_routes import router as trader_data_router
 from api.prompt_backtest_routes import router as prompt_backtest_router
 from api.system_routes import router as system_router
 from api.binance_routes import router as binance_router
+from api.okx_routes import router as okx_router  # [OKX 新增]
 from api.ai_stream_routes import router as ai_stream_router
 from api.hyper_ai_routes import router as hyper_ai_router
 from api.bot_routes import router as bot_router
@@ -758,6 +759,7 @@ app.include_router(prompt_backtest_router)
 app.include_router(program_router)
 app.include_router(system_router)
 app.include_router(binance_router)
+app.include_router(okx_router)  # [OKX 新增]
 app.include_router(ai_stream_router)
 app.include_router(hyper_ai_router)
 app.include_router(bot_router)

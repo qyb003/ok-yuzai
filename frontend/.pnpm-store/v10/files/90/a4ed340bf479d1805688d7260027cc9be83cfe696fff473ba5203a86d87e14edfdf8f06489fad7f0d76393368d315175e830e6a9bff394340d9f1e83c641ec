@@ -1,0 +1,76 @@
+"use client";
+
+// src/primitives/composer/ComposerAttachmentDropzone.tsx
+import { forwardRef, useCallback, useState } from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { useAssistantApi } from "../../context/index.js";
+import { jsx } from "react/jsx-runtime";
+var ComposerPrimitiveAttachmentDropzone = forwardRef(({ disabled, asChild = false, children, ...rest }, ref) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const api = useAssistantApi();
+  const handleDragEnterCapture = useCallback(
+    (e) => {
+      if (disabled) return;
+      e.preventDefault();
+      setIsDragging(true);
+    },
+    [disabled]
+  );
+  const handleDragOverCapture = useCallback(
+    (e) => {
+      if (disabled) return;
+      e.preventDefault();
+      if (!isDragging) setIsDragging(true);
+    },
+    [disabled, isDragging]
+  );
+  const handleDragLeaveCapture = useCallback(
+    (e) => {
+      if (disabled) return;
+      e.preventDefault();
+      const next = e.relatedTarget;
+      if (next && e.currentTarget.contains(next)) {
+        return;
+      }
+      setIsDragging(false);
+    },
+    [disabled]
+  );
+  const handleDrop = useCallback(
+    async (e) => {
+      if (disabled) return;
+      e.preventDefault();
+      setIsDragging(false);
+      for (const file of e.dataTransfer.files) {
+        try {
+          await api.composer().addAttachment(file);
+        } catch (error) {
+          console.error("Failed to add attachment:", error);
+        }
+      }
+    },
+    [disabled, api]
+  );
+  const dragProps = {
+    onDragEnterCapture: handleDragEnterCapture,
+    onDragOverCapture: handleDragOverCapture,
+    onDragLeaveCapture: handleDragLeaveCapture,
+    onDropCapture: handleDrop
+  };
+  const Comp = asChild ? Slot : "div";
+  return /* @__PURE__ */ jsx(
+    Comp,
+    {
+      ...isDragging ? { "data-dragging": "true" } : null,
+      ref,
+      ...dragProps,
+      ...rest,
+      children
+    }
+  );
+});
+ComposerPrimitiveAttachmentDropzone.displayName = "ComposerPrimitive.AttachmentDropzone";
+export {
+  ComposerPrimitiveAttachmentDropzone
+};
+//# sourceMappingURL=ComposerAttachmentDropzone.js.map

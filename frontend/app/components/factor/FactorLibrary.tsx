@@ -9,14 +9,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { apiRequest, getHyperliquidWatchlist, getBinanceWatchlist } from '@/lib/api'
+import { apiRequest, getHyperliquidWatchlist, getBinanceWatchlist, getOkxWatchlist } from '@/lib/api'  // [OKX 新增]
 import { RefreshCw, Info, CheckCircle2, ArrowUpDown, FlaskConical, Plus, Trash2, Pencil, BarChart3 } from 'lucide-react'
 import FactorAnalysisDialog from './FactorAnalysisDialog'
 import ExchangeIcon from '@/components/exchange/ExchangeIcon'
 import PacmanLoader from '@/components/ui/pacman-loader'
 import type { ExchangeId } from '@/lib/types/exchange'
 
-const EXCHANGES: ExchangeId[] = ['hyperliquid', 'binance']
+const EXCHANGES: ExchangeId[] = ['hyperliquid', 'binance', 'okx']  // [OKX 新增]
 const FORWARD_PERIODS = ['1h', '4h', '12h', '24h']
 
 // Function categories for the picker in Custom Factor dialog
@@ -136,6 +136,8 @@ export default function FactorLibrary() {
       try {
         const data = exchange === 'binance'
           ? await getBinanceWatchlist()
+          : exchange === 'okx'  // [OKX]
+          ? await getOkxWatchlist()
           : await getHyperliquidWatchlist()
         const syms = data.symbols || []
         setSymbols(syms)

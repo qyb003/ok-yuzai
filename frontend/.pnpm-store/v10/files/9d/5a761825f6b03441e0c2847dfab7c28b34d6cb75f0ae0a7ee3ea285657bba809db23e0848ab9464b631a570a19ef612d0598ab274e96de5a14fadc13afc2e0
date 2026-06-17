@@ -1,0 +1,31 @@
+"use client";
+
+// src/primitives/thread/ThreadScrollToBottom.tsx
+import {
+  createActionButton
+} from "../../utils/createActionButton.js";
+import { useCallback } from "react";
+import {
+  useThreadViewport,
+  useThreadViewportStore
+} from "../../context/react/ThreadViewportContext.js";
+var useThreadScrollToBottom = ({
+  behavior
+} = {}) => {
+  const isAtBottom = useThreadViewport((s) => s.isAtBottom);
+  const threadViewportStore = useThreadViewportStore();
+  const handleScrollToBottom = useCallback(() => {
+    threadViewportStore.getState().scrollToBottom({ behavior });
+  }, [threadViewportStore, behavior]);
+  if (isAtBottom) return null;
+  return handleScrollToBottom;
+};
+var ThreadPrimitiveScrollToBottom = createActionButton(
+  "ThreadPrimitive.ScrollToBottom",
+  useThreadScrollToBottom,
+  ["behavior"]
+);
+export {
+  ThreadPrimitiveScrollToBottom
+};
+//# sourceMappingURL=ThreadScrollToBottom.js.map

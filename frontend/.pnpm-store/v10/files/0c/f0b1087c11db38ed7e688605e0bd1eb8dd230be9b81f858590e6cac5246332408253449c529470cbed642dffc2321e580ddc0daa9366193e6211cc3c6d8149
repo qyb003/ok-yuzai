@@ -1,0 +1,3 @@
+export { useAssistantTransportRuntime, useAssistantTransportSendCommand, useAssistantTransportState, } from "./useAssistantTransportRuntime";
+export type { AssistantTransportConnectionMetadata, AssistantTransportCommand, AssistantTransportProtocol, } from "./types";
+//# sourceMappingURL=index.d.ts.map

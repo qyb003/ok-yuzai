@@ -134,7 +134,7 @@ def _define_tools():
                     "type": "object",
                     "properties": {
                         "account_id": {"type": "integer", "description": "Account ID to analyze. Use 0 for all accounts."},
-                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange to analyze trades from. REQUIRED."},
+                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange to analyze trades from. REQUIRED."},
                         "environment": {"type": "string", "enum": ["testnet", "mainnet"], "description": "Trading environment. REQUIRED for both exchanges."},
                         "days": {"type": "integer", "description": "Number of days to analyze (7, 30, 90)", "default": 30}
                     },
@@ -193,7 +193,7 @@ def _define_tools():
                     "type": "object",
                     "properties": {
                         "account_id": {"type": "integer", "description": "Account ID"},
-                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange to query trades from. REQUIRED."},
+                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange to query trades from. REQUIRED."},
                         "environment": {"type": "string", "enum": ["testnet", "mainnet"], "description": "Trading environment. REQUIRED for both exchanges."},
                         "limit": {"type": "integer", "description": "Number of recent trades to fetch", "default": 10},
                         "filter_type": {"type": "string", "enum": ["all", "wins", "losses"], "description": "Filter by trade outcome"}
@@ -228,7 +228,7 @@ def _define_tools():
                     "type": "object",
                     "properties": {
                         "account_id": {"type": "integer", "description": "Account ID (0 for all)"},
-                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange. REQUIRED."},
+                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange. REQUIRED."},
                         "environment": {"type": "string", "enum": ["testnet", "mainnet"], "description": "Environment. REQUIRED."},
                         "days": {"type": "integer", "description": "Analysis period in days", "default": 30}
                     },
@@ -244,7 +244,7 @@ def _define_tools():
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange (required)"},
+                        "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange (required)"},
                         "symbol": {"type": "string", "description": "Symbol for effectiveness ranking"},
                         "forward_period": {"type": "string", "enum": ["1h", "4h", "12h", "24h"], "description": "Forward period (default: 4h)"}
                     },
@@ -346,7 +346,7 @@ def _tool_get_attribution_summary(db: Session, args: Dict) -> str:
     days = args.get("days", 30)
 
     if not exchange:
-        return json.dumps({"error": "exchange is required (hyperliquid or binance)"})
+        return json.dumps({"error": "exchange is required (hyperliquid, binance, or okx)"})
 
     if not environment:
         return json.dumps({"error": "environment is required (testnet or mainnet)"})
@@ -570,7 +570,7 @@ def _tool_get_trade_decision_chain(db: Session, args: Dict) -> str:
         return json.dumps({"error": "account_id is required"})
 
     if not exchange:
-        return json.dumps({"error": "exchange is required (hyperliquid or binance)"})
+        return json.dumps({"error": "exchange is required (hyperliquid, binance, or okx)"})
 
     if not environment:
         return json.dumps({"error": "environment is required (testnet or mainnet)"})

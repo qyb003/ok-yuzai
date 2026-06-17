@@ -62,6 +62,7 @@ export default function HyperliquidPage() {
             >
               <option value="hyperliquid">Hyperliquid</option>
               <option value="binance">Binance Futures</option>
+              <option value="okx">OKX Perpetual</option>  {/* [OKX 新增] */}
             </select>
           </div>
 

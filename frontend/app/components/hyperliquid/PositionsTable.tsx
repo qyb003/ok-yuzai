@@ -29,6 +29,19 @@ import type { ExchangeType } from './WalletSelector';
 import { cn } from '@/lib/utils';
 import { formatTime } from '@/lib/dateTime';
 
+// [OKX] OKX 持仓获取函数（字段归一化 camelCase）
+async function getOkxPositions(accountId: number, environment: string) {
+  const res = await fetch(`/api/okx/accounts/${accountId}/positions?environment=${environment}`)
+  if (!res.ok) throw new Error('Failed to fetch OKX positions')
+  const data = await res.json()
+  return { positions: (data.positions || []).map((p: any) => ({
+    ...p, coin: p.coin ?? p.symbol ?? '', szi: p.szi ?? 0,
+    entryPx: p.entry_px ?? 0, positionValue: p.position_value ?? 0,
+    unrealizedPnl: p.unrealized_pnl ?? 0, marginUsed: p.margin_used ?? 0,
+    leverage: p.leverage ?? 1, markPrice: p.mark_price ?? 0,
+  })) }
+}
+
 interface PositionsTableProps {
   accountId: number;
   environment: 'testnet' | 'mainnet';
@@ -70,8 +83,11 @@ export default function PositionsTable({
   const loadPositions = async (forceRefresh?: boolean) => {
     try {
       setLoading(true);
+      // [OKX 修复] 三方交易所分发
       const data = exchange === 'hyperliquid'
         ? await getHyperliquidPositions(accountId, environment, forceRefresh)
+        : exchange === 'okx'
+        ? await getOkxPositions(accountId, environment)
         : await getBinancePositions(accountId, environment);
 
       const displayPositions: PositionDisplay[] = data.positions.map((pos) => {
@@ -146,6 +162,13 @@ export default function PositionsTable({
           toast.error(`Failed to close position: order status is "${orderStatus || 'unknown'}". Try again or adjust price.`);
           return;
         }
+      // [OKX 新增] OKX 平仓
+      } else if (exchange === 'okx') {
+        const res = await fetch(`/api/okx/accounts/${accountId}/close-position?symbol=${position.coin}&environment=${environment}`, { method: 'POST' })
+        if (!res.ok) throw new Error('OKX close position failed')
+        const data = await res.json()
+        if (data.success) { toast.success(`Closed ${position.side} position for ${position.coin}`) }
+        else { toast.error('Failed to close OKX position') }
       } else {
         // Binance close position
         const response = await closeBinancePosition(accountId, position.coin, environment);

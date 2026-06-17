@@ -1088,6 +1088,32 @@ export async function updateBinanceWatchlist(symbols: string[]): Promise<Binance
   return response.json()
 }
 
+// [OKX 新增] OKX Watchlist API
+export interface OkxWatchlistResponse {
+  symbols: string[]
+  count: number
+}
+export async function getOkxWatchlist(): Promise<OkxWatchlistResponse> {
+  const response = await apiRequest('/okx/symbols/watchlist')
+  return response.json()
+}
+export async function updateOkxWatchlist(symbols: string[]): Promise<OkxWatchlistResponse> {
+  const response = await apiRequest('/okx/symbols/watchlist', {
+    method: 'PUT',
+    body: JSON.stringify({ symbols }),
+  })
+  return response.json()
+}
+// [OKX 新增] 获取 OKX 所有可用交易对
+export interface OkxAvailableSymbolsResponse {
+  symbols: { symbol: string; name: string; type?: string }[]
+  count: number
+}
+export async function getOkxAvailableSymbols(): Promise<OkxAvailableSymbolsResponse> {
+  const response = await apiRequest('/okx/symbols/available')
+  return response.json()
+}
+
 export interface NewsSourceConfig {
   type: string
   adapter: string

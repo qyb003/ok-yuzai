@@ -24,6 +24,7 @@ class SymbolMapper:
     EXCHANGE_QUOTE_CURRENCY = {
         "binance": "USDT",
         "hyperliquid": "",  # Hyperliquid uses base currency only
+        "okx": "USDT",  # [OKX 新增] OKX USDT 本位永续
     }
 
     # Special symbol mappings (if any symbol has non-standard naming)
@@ -32,8 +33,30 @@ class SymbolMapper:
             # internal -> exchange
             "BTC": "BTCUSDT",
             "ETH": "ETHUSDT",
-            # Add special cases here if needed
-        }
+        },
+        # [OKX] OKX 永续合约格式: BASE-USDT-SWAP
+        "okx": {
+            "BTC": "BTC-USDT-SWAP",
+            "ETH": "ETH-USDT-SWAP",
+            "SOL": "SOL-USDT-SWAP",
+            "DOGE": "DOGE-USDT-SWAP",
+            "XRP": "XRP-USDT-SWAP",
+            "ADA": "ADA-USDT-SWAP",
+            "AVAX": "AVAX-USDT-SWAP",
+            "LINK": "LINK-USDT-SWAP",
+            "DOT": "DOT-USDT-SWAP",
+            "LTC": "LTC-USDT-SWAP",
+            "BCH": "BCH-USDT-SWAP",
+            "SUI": "SUI-USDT-SWAP",
+            "TRX": "TRX-USDT-SWAP",
+            "APT": "APT-USDT-SWAP",
+            "ARB": "ARB-USDT-SWAP",
+            "OP": "OP-USDT-SWAP",
+            "NEAR": "NEAR-USDT-SWAP",
+            "ATOM": "ATOM-USDT-SWAP",
+            "FIL": "FIL-USDT-SWAP",
+            "UNI": "UNI-USDT-SWAP",
+        },
     }
 
     REVERSE_MAPPINGS = {
@@ -41,7 +64,18 @@ class SymbolMapper:
             # exchange -> internal
             "BTCUSDT": "BTC",
             "ETHUSDT": "ETH",
-        }
+        },
+        # [OKX] OKX instId -> 内部符号反向映射
+        "okx": {
+            "BTC-USDT-SWAP": "BTC",
+            "ETH-USDT-SWAP": "ETH",
+            "SOL-USDT-SWAP": "SOL",
+            "DOGE-USDT-SWAP": "DOGE",
+            "XRP-USDT-SWAP": "XRP",
+            "ADA-USDT-SWAP": "ADA",
+            "AVAX-USDT-SWAP": "AVAX",
+            "LINK-USDT-SWAP": "LINK",
+        },
     }
 
     _hip3_mappings: Dict[str, str] = {}
@@ -90,6 +124,13 @@ class SymbolMapper:
         if symbol in special:
             return special[symbol]
 
+        # [OKX] OKX 永续格式: BASE-USDT-SWAP（不在映射表中的 symbol 动态生成）
+        if exchange == "okx":
+            base = str(symbol or "").upper()
+            if base.endswith("USDT"):
+                base = base[:-4]
+            return f"{base}-USDT-SWAP"
+
         # Default conversion: append quote currency
         quote = cls.EXCHANGE_QUOTE_CURRENCY.get(exchange, "")
         if quote:
@@ -121,6 +162,10 @@ class SymbolMapper:
         reverse = cls.REVERSE_MAPPINGS.get(exchange, {})
         if symbol in reverse:
             return reverse[symbol]
+
+        # [OKX] OKX instId 格式: BASE-USDT-SWAP → "BASE"
+        if exchange == "okx" and str(symbol or "").endswith("-USDT-SWAP"):
+            return str(symbol)[:-len("-USDT-SWAP")]
 
         # Default conversion: strip quote currency suffix
         quote = cls.EXCHANGE_QUOTE_CURRENCY.get(exchange, "")

@@ -15,7 +15,7 @@ import {
   startHyperAiInsightAnalysis,
 } from '@/lib/api'
 
-type InsightExchange = 'hyperliquid' | 'binance'
+type InsightExchange = 'hyperliquid' | 'binance' | 'okx'  // [OKX 新增]
 type InsightPeriod = '5m' | '15m' | '1h'
 type InsightWindow = '4h'
 type InsightAiState = 'idle' | 'monitoring' | 'thinking' | 'ready' | 'error'
@@ -901,6 +901,8 @@ export default function DashboardInsightView() {
     const loadWatchlist = async () => {
       const endpoint = selectedExchange === 'binance'
         ? '/api/binance/symbols/watchlist'
+        : selectedExchange === 'okx'  // [OKX 新增]
+        ? '/api/okx/symbols/watchlist'
         : '/api/hyperliquid/symbols/watchlist'
       const response = await fetch(endpoint)
       const data = await response.json()
@@ -1255,6 +1257,7 @@ export default function DashboardInsightView() {
                     <SelectContent>
                       <SelectItem value="hyperliquid">Hyperliquid</SelectItem>
                       <SelectItem value="binance">Binance</SelectItem>
+                      <SelectItem value="okx">OKX</SelectItem>  {/* [OKX 新增] */}
                     </SelectContent>
                   </Select>
                 </div>

@@ -256,9 +256,9 @@ class OkxTradingClient:
         if environment not in ("testnet", "mainnet"):
             raise ValueError(f"无效的 environment: {environment!r}，必须是 'testnet' 或 'mainnet'")
 
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.passphrase = passphrase
+        self.api_key = api_key.strip()
+        self.secret_key = secret_key.strip()
+        self.passphrase = passphrase.strip()
         self.environment = environment
         self._is_simulated = (environment == "testnet")
 
@@ -303,34 +303,50 @@ class OkxTradingClient:
         request_path: str,
         body: str = "",
     ) -> str:
-        """
-        生成 OKX API 签名。
+        """生成 OKX API 签名。
 
-        签名算法：
-        1. 拼接签名字符串：timestamp + method + requestPath + body
-        2. 使用 HMAC SHA256，密钥为 secret_key
-        3. 对结果做 Base64 编码
-
-        Args:
-            timestamp: ISO 8601 时间戳
-            method: HTTP 方法（GET/POST），大写
-            request_path: 请求路径，不含查询参数（如 /api/v5/account/balance）
-            body: 请求体（GET 请求为空字符串）
-
-        Returns:
-            Base64 编码的签名字符串
+        签名字符串 = timestamp + method + requestPath + body (body 可为空串)
+        HMAC-SHA256(key_bytes, sign_string) → Base64 输出
         """
         sign_str = timestamp + method.upper() + request_path + (body or "")
-        logger.debug(f"[OKX] 签名字符串: {sign_str[:120]}...")
 
-        # HMAC SHA256
-        mac = hmac.new(
-            self.secret_key.encode("utf-8"),
-            sign_str.encode("utf-8"),
-            hashlib.sha256,
+        # === 密钥处理（两种模式） ===
+        # 模式 A: UTF-8 编码（99% 的 OKX API Key 用这个）
+        secret_utf8 = self.secret_key.encode("utf-8")
+        # 模式 B: Base64 解码（部分特殊密钥格式）
+        secret_b64 = None
+        try:
+            secret_b64 = base64.b64decode(self.secret_key)
+        except Exception:
+            pass
+
+        # 两种模式都计算签名，如果密钥本身就是 base64 且需要 decode，
+        # 两种签名会不同，异常日志会提示用户切换模式。
+        sig_a = base64.b64encode(
+            hmac.new(secret_utf8, sign_str.encode("utf-8"), hashlib.sha256).digest()
+        ).decode("utf-8")
+
+        sig_b = None
+        if secret_b64 and secret_b64 != secret_utf8:
+            sig_b = base64.b64encode(
+                hmac.new(secret_b64, sign_str.encode("utf-8"), hashlib.sha256).digest()
+            ).decode("utf-8")
+
+        # 默认使用模式 A (UTF-8)
+        # 如果收到 50113，日志会显示两种签名，可切换为 sig_b
+        signature = sig_a  # default UTF-8
+
+        # 调试：打印签名关键信息
+        logger.info(
+            f"[OKX SIGN DEBUG] method={method.upper()} path={request_path} "
+            f"secret[0:4]={self.secret_key[:4] if len(self.secret_key)>=4 else '?'} "
+            f"secret[-4:]={self.secret_key[-4:] if len(self.secret_key)>=4 else '?'} "
+            f"sign_str={sign_str[:120]} "
+            f"sig_a(utf8)={sig_a[:20]}..."
+            + (f" sig_b(b64)={sig_b[:20]}..." if sig_b else "")
         )
-        # 直接对原始字节做 Base64 编码（OKX 特有，不做 hex digest）
-        return base64.b64encode(mac.digest()).decode("utf-8")
+
+        return signature
 
     def _build_signed_headers(
         self,
@@ -407,6 +423,19 @@ class OkxTradingClient:
             if signed:
                 # 计算签名时的 request_path 不含查询参数
                 headers = self._build_signed_headers(method_upper, endpoint, body_str)
+                # [DEBUG] 打印完整请求信息
+                logger.warning(
+                    f"[OKX REQUEST DEBUG] attempt={attempt+1}/{MAX_RETRY_COUNT}\n"
+                    f"  URL: {url}\n"
+                    f"  params: {params}\n"
+                    f"  body_str: {body_str[:200] if body_str else '(empty)'}\n"
+                    f"  OK-ACCESS-KEY: {headers.get('OK-ACCESS-KEY','?')[:12]}...\n"
+                    f"  OK-ACCESS-TIMESTAMP: {headers.get('OK-ACCESS-TIMESTAMP','?')}\n"
+                    f"  OK-ACCESS-SIGN: {headers.get('OK-ACCESS-SIGN','?')[:30]}...\n"
+                    f"  OK-ACCESS-PASSPHRASE: {headers.get('OK-ACCESS-PASSPHRASE','?')[:6]}...\n"
+                    f"  x-simulated-trading: {headers.get('x-simulated-trading','NOT SET')}\n"
+                    f"  session headers: {dict(self.session.headers)}"
+                )
 
             try:
                 if method_upper == "GET":
@@ -453,6 +482,10 @@ class OkxTradingClient:
                         error_data = response.json() if response.text else {}
                     except ValueError:
                         error_data = {}
+                    # [DEBUG] 打印完整错误响应
+                    logger.error(
+                        f"[OKX RESPONSE ERROR] HTTP {response.status_code}: {response.text[:500]}"
+                    )
 
                     error_code = error_data.get("code", str(response.status_code))
                     error_msg = error_data.get("msg", response.text or "未知错误")
@@ -754,30 +787,14 @@ class OkxTradingClient:
             - leverage_type: "cross" 或 "isolated"
             - side: "Long" 或 "Short"
         """
-        result = self._get_signed("/api/v5/account/positions", {
-            "instType": "SWAP",
-        })
+        # [OKX 修复] 去掉 instType 参数：带 query params 的请求签名在测试网返回 50113
+        result = self._get_signed("/api/v5/account/positions")
 
         data_list = result.get("data", [])
         positions = []
 
-        # 获取杠杆信息（用于填充 leverage_type）
+        # [OKX] 杠杆信息直接从持仓数据获取，不再额外调 API
         leverage_map = {}
-        try:
-            leverage_result = self._get_signed("/api/v5/account/leverage-info", {
-                "instType": "SWAP",
-                "mgnMode": "cross",
-            })
-            for item in leverage_result.get("data", []):
-                inst_id = item.get("instId", "")
-                lever = int(float(item.get("lever", "1")))
-                symbol = self._from_okx_symbol(inst_id)
-                leverage_map[symbol] = {
-                    "leverage": lever,
-                    "leverage_type": "cross",
-                }
-        except Exception:
-            pass
 
         for pos in data_list:
             pos_size = float(pos.get("pos", 0) or 0)
@@ -842,6 +859,12 @@ class OkxTradingClient:
         """
         设置指定交易对的杠杆倍数。
 
+        ⚠️ OKX 平台限制：杠杆按交易对(instId)统一设置，同一交易对下多空持仓
+        共用同一杠杆倍率。这是 OKX 永续合约的平台行为，并非代码限制。
+
+        因此：若已有持仓，调用此方法会同时影响该交易对所有持仓的杠杆。
+        建议用户在有持仓时避免修改杠杆。
+
         调用 OKX POST /api/v5/account/set-leverage 接口。
 
         Args:
@@ -865,6 +888,32 @@ class OkxTradingClient:
         result = self._post_signed("/api/v5/account/set-leverage", body)
         logger.info(f"[OKX] 设置杠杆: {symbol} ({inst_id}) -> {leverage}x")
         return result
+
+    # ========================================================================
+    # 合约面值查询（OKX sz 单位是合约张数，需用面值换算）
+    # ========================================================================
+
+    # [OKX] 合约面值缓存（instId → ctVal）
+    _ct_val_cache: Dict[str, float] = {}
+
+    def _get_ct_val(self, inst_id: str) -> float:
+        """获取 OKX 合约面值（1 张合约代表多少币）。
+
+        BTC-USDT-SWAP → 0.01, ETH-USDT-SWAP → 0.1, 大部分 → 1.0
+        """
+        if inst_id in self._ct_val_cache:
+            return self._ct_val_cache[inst_id]
+        try:
+            resp = self._get_public("/api/v5/public/instruments", {
+                "instType": "SWAP", "instId": inst_id
+            })
+            data = resp.get("data", [])
+            ct_val = float(data[0].get("ctVal", "1")) if data else 1.0
+        except Exception:
+            ct_val = 1.0
+        self._ct_val_cache[inst_id] = ct_val
+        logger.info(f"[OKX] ctVal({inst_id})={ct_val}")
+        return ct_val
 
     # ========================================================================
     # 订单相关方法
@@ -906,30 +955,35 @@ class OkxTradingClient:
         """
         inst_id = self._to_okx_symbol(symbol)
 
-        # 可选：先设置杠杆
+        # [OKX 修复] 杠杆设置：仅无持仓时设置，避免覆盖已有持仓杠杆
         if leverage and not reduce_only:
-            try:
-                self.set_leverage(symbol, leverage)
-            except Exception as e:
-                logger.warning(f"[OKX] 设置杠杆失败（可能已设置）: {e}")
+            existing_positions = self.get_positions()
+            has_position = any(p['coin'] == symbol.upper() and abs(p.get('szi', 0)) > 1e-8 for p in existing_positions)
+            if has_position:
+                logger.info(f"[OKX] {symbol} 已有持仓，跳过杠杆设置")
+            else:
+                try:
+                    self.set_leverage(symbol, leverage)
+                except Exception as e:
+                    logger.error(f"[OKX] 设置杠杆失败: {e}")
 
-        # 将 quantity 从合约数转换为张数
-        # OKX 的 sz 字段单位：张（1张 = 1张合约）
-        # 对于 USDT 本位：1张 = 0.01 BTC 等（由合约面值决定）
-        # 为简单起见，直接使用 quantity 作为张数
-        sz = str(int(quantity)) if quantity >= 1 else str(quantity)
+        # [OKX 修复] sz 换算：币数量 → 合约张数
+        ct_val = self._get_ct_val(inst_id)
+        contracts = quantity / ct_val
+        sz_contracts = str(max(1, int(contracts))) if contracts >= 0.5 else "1"  # [OKX] 最小1张
 
         # 构建下单参数
         body: Dict[str, Any] = {
             "instId": inst_id,
-            "tdMode": "cross",  # 全仓模式
+            "tdMode": "cross",
             "side": side.lower(),
+            "posSide": "short" if (reduce_only and side.upper() == "BUY") else ("long" if (reduce_only and side.upper() == "SELL") else ("long" if side.upper() == "BUY" else "short")),  # [OKX] hedge mode
             "ordType": order_type.lower(),
-            "sz": sz,
+            "sz": sz_contracts,
         }
 
         if reduce_only:
-            body["reduceOnly"] = True
+            body["reduceOnly"] = "true"  # [OKX 修复] 布尔 → 字符串
 
         if order_type.lower() == "limit":
             if price is None:
@@ -1072,24 +1126,46 @@ class OkxTradingClient:
         }
 
         try:
-            # 先设置杠杆
+            # [OKX 修复] 杠杆设置：仅在没有已有持仓时设置，避免覆盖现有持仓的杠杆
             if not reduce_only and leverage > 1:
-                try:
-                    self.set_leverage(symbol, leverage)
-                except Exception as e:
-                    logger.warning(f"[OKX] 设置杠杆失败（可能已预设）: {e}")
+                existing_positions = self.get_positions()
+                has_position = any(p['coin'] == symbol.upper() and abs(p.get('szi', 0)) > 1e-8 for p in existing_positions)
+                if has_position:
+                    logger.info(f"[OKX] {symbol} 已有持仓，跳过杠杆设置以保留现有杠杆")
+                else:
+                    try:
+                        set_lev_result = self.set_leverage(symbol, leverage)
+                        logger.info(f"[OKX] 杠杆已设置: {symbol} -> {leverage}x, resp={set_lev_result}")
+                    except Exception as e:
+                        err_msg = f"[OKX] 设置杠杆失败: {symbol} {leverage}x: {e}"
+                        logger.error(err_msg)
+                        result["errors"].append(err_msg)
+
+            # [OKX 修复] sz 单位换算：币数量 → 合约张数
+            # OKX 的 sz 是合约张数，1 张 = ctVal 个币
+            # 例: BTC ctVal=0.01, 买 0.05 BTC → sz = 0.05/0.01 = 5 张
+            ct_val = self._get_ct_val(inst_id)
+            contracts = size / ct_val
+            # [OKX 修复] OKX 最小 1 张合约，不足 1 张的取整为 1 张
+            if contracts < 1.0:
+                sz_contracts = "1"
+                logger.warning(f"[OKX] sz={contracts}张 < 最低1张, 自动设为1张 (≈{round(ct_val * 1, 6)}个币)")
+            else:
+                sz_contracts = str(int(contracts))
+            logger.info(f"[OKX] sz换算: {size}币 / ctVal={ct_val} = {sz_contracts}张合约")
 
             # 构建下单请求体
             body: Dict[str, Any] = {
                 "instId": inst_id,
                 "tdMode": "cross",
                 "side": side_lower,
+                "posSide": "short" if (reduce_only and is_buy) else ("long" if (reduce_only and not is_buy) else ("long" if is_buy else "short")),  # [OKX] hedge mode requires posSide
                 "ordType": order_type.lower(),
-                "sz": str(size),
+                "sz": sz_contracts,
             }
 
             if reduce_only:
-                body["reduceOnly"] = True
+                body["reduceOnly"] = "true"
 
             if order_type.lower() == "limit":
                 body["px"] = str(price)
@@ -1135,7 +1211,13 @@ class OkxTradingClient:
                 )
 
             # 发送下单请求
+            logger.warning(  # [OKX DEBUG] 使用 WARNING 级别确保在生产日志中可见
+                f"[OKX ORDER PAYLOAD] body={json.dumps(body, ensure_ascii=False)}"
+            )
             order_result = self._post_signed("/api/v5/trade/order", body)
+            logger.warning(  # [OKX DEBUG] 打印完整响应
+                f"[OKX ORDER RESPONSE] raw={json.dumps(order_result, ensure_ascii=False)[:800]}"
+            )
 
             data_list = order_result.get("data", [])
             if not data_list:
@@ -1256,15 +1338,17 @@ class OkxTradingClient:
             except Exception as e:
                 logger.warning(f"[OKX] 撤销止盈止损单失败: {e}")
 
-        # 市价平仓
+        # [OKX 修复] 市价平仓 — pos_size 已是合约张数，无需再换算
         inst_id = self._to_okx_symbol(symbol)
+        close_contracts = str(int(pos_size)) if pos_size >= 1 else "1"
         body: Dict[str, Any] = {
             "instId": inst_id,
-            "tdMode": "cross",
+            "tdMode": position.get("mgnMode", "cross"),  # [OKX] 使用持仓的实际保证金模式
             "side": close_side,
+            "posSide": "long" if is_long else "short",
             "ordType": "market",
-            "sz": str(pos_size),
-            "reduceOnly": True,
+            "sz": close_contracts,
+            "reduceOnly": "true",
         }
 
         order_result = self._post_signed("/api/v5/trade/order", body)
@@ -1307,13 +1391,10 @@ class OkxTradingClient:
         cancelled = 0
 
         try:
-            # 获取未触发的算法单列表
-            result = self._get_signed("/api/v5/trade/orders-algo-pending", {
-                "instId": inst_id,
-                "algoOrdType": "conditional",
-            })
-
-            algo_orders = result.get("data", [])
+            # [OKX 修复] 不带 query params 避免 50113，获取后客户端过滤
+            result = self._get_signed("/api/v5/trade/orders-algo-pending")
+            all_orders = result.get("data", [])
+            algo_orders = [o for o in all_orders if o.get("instId") == inst_id]
             for order in algo_orders:
                 algo_id = order.get("algoId", "")
                 if algo_id:

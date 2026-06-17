@@ -74,7 +74,7 @@ class BindingCreate(BaseModel):
     scheduled_trigger_enabled: bool = False
     is_active: bool = True
     params_override: Optional[Dict[str, Any]] = None
-    exchange: str = "hyperliquid"  # "hyperliquid" or "binance"
+    exchange: str = "hyperliquid"  # "hyperliquid", "binance", or "okx"
 
 
 class BindingUpdate(BaseModel):
@@ -83,7 +83,7 @@ class BindingUpdate(BaseModel):
     scheduled_trigger_enabled: Optional[bool] = None
     is_active: Optional[bool] = None
     params_override: Optional[Dict[str, Any]] = None
-    exchange: Optional[str] = None  # "hyperliquid" or "binance"
+    exchange: Optional[str] = None  # "hyperliquid", "binance", or "okx"
 
 
 class BindingResponse(BaseModel):
@@ -99,7 +99,7 @@ class BindingResponse(BaseModel):
     is_active: bool
     last_trigger_at: Optional[str]
     params_override: Optional[Dict[str, Any]]
-    exchange: str = "hyperliquid"  # "hyperliquid" or "binance"
+    exchange: str = "hyperliquid"  # "hyperliquid", "binance", or "okx"
     wallets: List[WalletInfo] = []  # AI Trader's wallets
     created_at: str
     updated_at: str
@@ -270,7 +270,7 @@ def _binding_to_response(binding: AccountProgramBinding, db: Session) -> Binding
             pass
 
     # Query wallets for this AI Trader based on exchange type
-    from database.models import HyperliquidWallet, BinanceWallet
+    from database.models import HyperliquidWallet, BinanceWallet, OkxWallet  # [OKX 新增]
     from utils.encryption import decrypt_private_key
     from services.hyperliquid_environment import get_global_trading_mode
 
@@ -278,14 +278,15 @@ def _binding_to_response(binding: AccountProgramBinding, db: Session) -> Binding
     exchange = binding.exchange or "hyperliquid"
     environment = get_global_trading_mode(db)
 
-    if exchange == "binance":
-        # For Binance, show masked API Key (first 4 and last 4 chars)
-        binance_wallets = db.query(BinanceWallet).filter(
-            BinanceWallet.account_id == binding.account_id,
-            BinanceWallet.environment == environment,
-            BinanceWallet.is_active == "true"
+    if exchange == "binance" or exchange == "okx":  # [OKX 修改] OKX 也显示 API Key
+        # For Binance/OKX, show masked API Key (first 4 and last 4 chars)
+        wallet_model = BinanceWallet if exchange == "binance" else OkxWallet  # [OKX]
+        cex_wallets = db.query(wallet_model).filter(
+            wallet_model.account_id == binding.account_id,  # [OKX] 动态模型查询
+            wallet_model.environment == environment,
+            wallet_model.is_active == "true"
         ).all()
-        for w in binance_wallets:
+        for w in cex_wallets:
             if w.api_key_encrypted:
                 try:
                     api_key = decrypt_private_key(w.api_key_encrypted)
@@ -1263,11 +1264,13 @@ def preview_run_binding(binding_id: int, db: Session = Depends(get_db)):
 
     # Create trading client and data provider with query recording
     try:
-        if exchange == "binance":
-            # Use Binance trading client
+        if exchange == "okx":  # [OKX 新增]
+            from services.okx_environment import get_okx_client
+            trading_client = get_okx_client(db, binding.account_id, override_environment=global_environment)
+            environment = global_environment
+        elif exchange == "binance":
             from services.binance_trading_client import BinanceTradingClient
             from database.models import BinanceWallet as BinanceWalletModel
-
             from utils.encryption import decrypt_private_key
 
             binance_wallet = db.query(BinanceWalletModel).filter(
@@ -1283,13 +1286,10 @@ def preview_run_binding(binding_id: int, db: Session = Depends(get_db)):
                     execution_time_ms=(time.time() - start_time) * 1000
                 )
 
-            # Decrypt API keys
             api_key = decrypt_private_key(binance_wallet.api_key_encrypted)
             secret_key = decrypt_private_key(binance_wallet.secret_key_encrypted)
-
             trading_client = BinanceTradingClient(
-                api_key=api_key,
-                secret_key=secret_key,
+                api_key=api_key, secret_key=secret_key,
                 environment=binance_wallet.environment or "testnet"
             )
             environment = binance_wallet.environment or "testnet"
@@ -1552,7 +1552,7 @@ def list_executions(
     after: Optional[str] = Query(None, description="ISO timestamp, returns logs after this time"),
     action: Optional[str] = Query(None, regex="^(buy|sell|hold|close)$", description="Filter by decision action"),
     limit: int = Query(50, le=200),
-    exchange: Optional[str] = Query(None, regex="^(hyperliquid|binance)$"),
+    exchange: Optional[str] = Query(None, regex="^(hyperliquid|binance|okx)$"),
     db: Session = Depends(get_db)
 ):
     """List program execution logs for Feed display."""

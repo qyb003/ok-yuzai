@@ -1,0 +1,20 @@
+import { ResourceElement } from "@assistant-ui/tap";
+import { Unsubscribe } from "../../types";
+export interface Store<TState> {
+    /**
+     * Get the current state of the store.
+     */
+    getState(): TState;
+    /**
+     * Subscribe to the store.
+     */
+    subscribe(listener: () => void): Unsubscribe;
+    /**
+     * Synchronously flush all the updates to the store.
+     */
+    flushSync(): void;
+}
+export declare const asStore: <TState, TProps>(props: ResourceElement<TState, TProps>, options?: {
+    key?: string | number;
+} | undefined) => ResourceElement<Store<TState>, ResourceElement<TState, TProps>>;
+//# sourceMappingURL=store.d.ts.map

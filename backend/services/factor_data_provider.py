@@ -73,6 +73,8 @@ def ensure_kline_coverage(
     try:
         if exchange == "binance":
             _backfill_binance(db, symbol, period, min_bars)
+        elif exchange == "okx":  # [OKX 新增]
+            _backfill_okx(db, symbol, period, min_bars)
         else:
             _backfill_hyperliquid(symbol, period, min_bars)
     except Exception as e:
@@ -139,6 +141,43 @@ def _backfill_binance(db: Session, symbol: str, period: str, target_bars: int):
             break
 
     print(f"[FactorDataProvider] Binance backfill {symbol}/{period}: "
+          f"done, total {total_fetched} bars", flush=True)
+
+
+# [OKX 新增] OKX K线回填
+def _backfill_okx(db: Session, symbol: str, period: str, target_bars: int):
+    """Backfill OKX klines via REST API with pagination."""
+    from services.exchanges.okx_adapter import OkxAdapter
+    from services.exchanges.data_persistence import ExchangeDataPersistence
+
+    adapter = OkxAdapter()
+    persistence = ExchangeDataPersistence(db)
+
+    # OKX max 300 per request
+    batch_size = 300
+    total_fetched = 0
+    end_time = int(time.time() * 1000)
+    period_seconds = _period_to_seconds(period)
+    start_time = end_time - (target_bars * period_seconds * 1000)
+
+    current_end = end_time
+    while total_fetched < target_bars and current_end > start_time:
+        try:
+            klines = adapter.fetch_klines(
+                symbol, period, limit=batch_size, end_time=current_end
+            )
+            if not klines:
+                break
+            result = persistence.save_klines(klines)
+            total_fetched += len(klines)
+            earliest_ts = min(k.timestamp for k in klines)
+            current_end = int(earliest_ts * 1000) - 1
+            time.sleep(1)  # Rate limit
+        except Exception as e:
+            logger.warning(f"[FactorDataProvider] OKX batch failed: {e}")
+            break
+
+    print(f"[FactorDataProvider] OKX backfill {symbol}/{period}: "
           f"done, total {total_fetched} bars", flush=True)
 
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'  // [OKX 修复] Badge 在 OKX watchlist 中使用
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -19,6 +20,9 @@ import {
   getBinanceAvailableSymbols,
   getBinanceWatchlist,
   updateBinanceWatchlist,
+  getOkxWatchlist,  // [OKX 新增]
+  updateOkxWatchlist,  // [OKX 新增]
+  getOkxAvailableSymbols,  // [OKX 新增]
   getNewsSources,
   updateNewsSources,
   testNewsSource,
@@ -67,6 +71,12 @@ export default function SettingsPage() {
   const [bnMaxSymbols, setBnMaxSymbols] = useState(10)
   const [bnLoading, setBnLoading] = useState(true)
   const [bnSaving, setBnSaving] = useState(false)
+
+  // [OKX 新增] OKX Watchlist state
+  const [okxAvailableSymbols, setOkxAvailableSymbols] = useState<{symbol: string; name: string}[]>([])
+  const [okxWatchlistSymbols, setOkxWatchlistSymbols] = useState<string[]>([])
+  const [okxLoading, setOkxLoading] = useState(true)
+  const [okxSaving, setOkxSaving] = useState(false)
   const [bnError, setBnError] = useState<string | null>(null)
   const [bnSuccess, setBnSuccess] = useState<string | null>(null)
   const [bnSearchQuery, setBnSearchQuery] = useState('')
@@ -86,6 +96,7 @@ export default function SettingsPage() {
   const [retentionDays, setRetentionDays] = useState<Record<string, string>>({
     hyperliquid: '365',
     binance: '365',
+    okx: '365',  // [OKX 新增]
   })
   const [retentionSaving, setRetentionSaving] = useState(false)
   const [retentionError, setRetentionError] = useState<string | null>(null)
@@ -120,8 +131,8 @@ export default function SettingsPage() {
   const [newsTestError, setNewsTestError] = useState<string | null>(null)
   const [newsTestResult, setNewsTestResult] = useState<TestNewsSourceResponse | null>(null)
 
-  // Determine current exchange from active tab
-  const currentExchange = activeTab === 'hyperliquid-data' ? 'hyperliquid' : activeTab === 'binance-data' ? 'binance' : null
+  // Determine current exchange from active tab  [OKX 修改]
+  const currentExchange = activeTab === 'hyperliquid-data' ? 'hyperliquid' : activeTab === 'binance-data' ? 'binance' : activeTab === 'okx-data' ? 'okx' : null
 
   const toggleLanguage = (lang: 'en' | 'zh') => {
     i18n.changeLanguage(lang)
@@ -136,15 +147,18 @@ export default function SettingsPage() {
   const fetchWatchlist = useCallback(async () => {
     setHlLoading(true)
     setBnLoading(true)
+    setOkxLoading(true)  // [OKX 新增]
     setHlError(null)
     setBnError(null)
     try {
-      // Fetch both Hyperliquid and Binance data in parallel
-      const [hlAvailable, hlWatchlist, bnAvailable, bnWatchlist] = await Promise.all([
+      // Fetch all three exchanges in parallel  [OKX 修改]
+      const [hlAvailable, hlWatchlist, bnAvailable, bnWatchlist, okxAvailable, okxWatchlist] = await Promise.all([
         getHyperliquidAvailableSymbols(),
         getHyperliquidWatchlist(),
         getBinanceAvailableSymbols(),
         getBinanceWatchlist(),
+        getOkxAvailableSymbols().catch(() => ({ symbols: [], count: 0 })),  // [OKX 修复] 使用可用币种端点
+        getOkxWatchlist().catch(() => ({ symbols: [], count: 0 })),  // [OKX] 自选列表
       ])
       setHlAvailableSymbols(hlAvailable.symbols || [])
       setHlMaxSymbols(hlWatchlist.max_symbols ?? 10)
@@ -152,6 +166,9 @@ export default function SettingsPage() {
       setBnAvailableSymbols(bnAvailable.symbols || [])
       setBnMaxSymbols(bnWatchlist.max_symbols ?? 10)
       setBnWatchlistSymbols(bnWatchlist.symbols || [])
+      // [OKX] 设置可用币种和自选列表
+      setOkxAvailableSymbols(okxAvailable.symbols || [])
+      setOkxWatchlistSymbols(okxWatchlist.symbols || [])
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to load watchlist'
       setHlError(errorMsg)
@@ -159,6 +176,7 @@ export default function SettingsPage() {
     } finally {
       setHlLoading(false)
       setBnLoading(false)
+      setOkxLoading(false)  // [OKX 新增]
     }
   }, [])
 
@@ -349,6 +367,18 @@ export default function SettingsPage() {
       setBnError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setBnSaving(false)
+    }
+  }
+
+  // [OKX 新增] OKX Watchlist 保存处理
+  const handleSaveOkxWatchlist = async () => {
+    setOkxSaving(true)
+    try {
+      await updateOkxWatchlist(okxWatchlistSymbols)
+    } catch (err) {
+      console.error('Failed to save OKX watchlist:', err)
+    } finally {
+      setOkxSaving(false)
     }
   }
 
@@ -595,9 +625,9 @@ export default function SettingsPage() {
         </select>
       </div>
 
-      {/* Tabs: Watchlist | Hyperliquid Data | Binance Data | News Sources */}
+      {/* Tabs: Watchlist | Hyperliquid Data | Binance Data | OKX Data | News Sources */}  {/* [OKX] */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-4 max-w-3xl shrink-0">
+        <TabsList className="grid w-full grid-cols-5 max-w-4xl shrink-0">  {/* [OKX] grid-cols-4→5 */}
           <TabsTrigger value="watchlist">{t('settings.watchlist', 'Watchlist')}</TabsTrigger>
           <TabsTrigger value="hyperliquid-data" className="flex items-center gap-1.5">
             <ExchangeIcon exchangeId="hyperliquid" size={16} />
@@ -606,6 +636,11 @@ export default function SettingsPage() {
           <TabsTrigger value="binance-data" className="flex items-center gap-1.5">
             <ExchangeIcon exchangeId="binance" size={16} />
             Binance
+          </TabsTrigger>
+          {/* [OKX 新增] OKX Data tab */}
+          <TabsTrigger value="okx-data" className="flex items-center gap-1.5">
+            <ExchangeIcon exchangeId="okx" size={16} />
+            OKX
           </TabsTrigger>
           <TabsTrigger value="news-sources">{t('settings.newsSources', 'News Sources')}</TabsTrigger>
         </TabsList>
@@ -730,6 +765,48 @@ export default function SettingsPage() {
                 </Button>
                 {bnError && <span className="text-red-500 text-xs">{bnError}</span>}
                 {bnSuccess && <span className="text-green-500 text-xs">{bnSuccess}</span>}
+              </CardFooter>
+            </Card>
+
+            {/* [OKX 新增] OKX Watchlist */}
+            <Card>
+              <CardHeader className="shrink-0 pb-3">
+                <div className="flex items-center gap-2">
+                  <ExchangeIcon exchangeId="okx" size={24} />
+                  <CardTitle className="text-base">OKX</CardTitle>
+                </div>
+                <CardDescription className="text-xs">
+                  {t('settings.selectedCount', 'Selected')}: {okxWatchlistSymbols.length} / 10
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-sm text-muted-foreground mb-3">
+                  {t('settings.selectSymbols', 'Select which symbols to collect data for')}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {/* [OKX 修复] availableOKXSymbols → okxAvailableSymbols */}
+                  {okxAvailableSymbols.map((s) => (
+                    <Badge
+                      key={s.symbol}
+                      variant={okxWatchlistSymbols.includes(s.symbol) ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        if (okxWatchlistSymbols.includes(s.symbol)) {
+                          setOkxWatchlistSymbols(okxWatchlistSymbols.filter(x => x !== s.symbol))
+                        } else if (okxWatchlistSymbols.length < 10) {
+                          setOkxWatchlistSymbols([...okxWatchlistSymbols, s.symbol])
+                        }
+                      }}
+                    >
+                      {s.symbol}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+              <CardFooter className="pt-0">
+                <Button size="sm" onClick={handleSaveOkxWatchlist}>
+                  {t('common.save', 'Save')}
+                </Button>
               </CardFooter>
             </Card>
           </div>
@@ -1004,6 +1081,75 @@ export default function SettingsPage() {
                 <div className="text-sm font-medium mb-3">{t('settings.klineCoverage', 'K-line Coverage')}</div>
                 <DataCoverageHeatmap exchange="binance" dataType="klines" />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* [OKX 新增] OKX Data Tab — 与 Binance Data 完全对称 */}
+        <TabsContent value="okx-data" className="mt-4 flex-1 min-h-0 flex flex-col">
+          <Card className="flex flex-col flex-1 min-h-0">
+            <CardHeader className="shrink-0">
+              <CardTitle className="flex items-center gap-2">
+                <ExchangeIcon exchangeId="okx" size={24} />
+                {t('settings.dataCollection', 'Data Collection')}
+              </CardTitle>
+              <CardDescription>
+                {t('settings.dataCollectionDesc', 'Market flow data storage statistics')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto min-h-0 space-y-6">
+              {storageLoading ? (
+                <div className="text-muted-foreground">{t('common.loading', 'Loading...')}</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">{t('settings.currentStorage', 'Current Storage')}</div>
+                      <div className="text-xl font-semibold">
+                        {storageStats['okx'] ? `${storageStats['okx'].total_size_mb} MB` : '0 MB'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">{t('settings.collectedSymbols', 'Collected Symbols')}</div>
+                      <div className="text-xl font-semibold">
+                        {storageStats['okx'] ? storageStats['okx'].symbol_count : 0}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">{t('settings.retentionDays', 'Retention Days')}</div>
+                      <div className="text-xl font-semibold">
+                        {retentionDays['okx'] || '365'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">{t('settings.maxStorageEstimate', 'Max Storage Estimate')}</div>
+                      <div className="text-xl font-semibold">
+                        {storageStats['okx']
+                          ? (watchlistSymbols.length * parseInt(retentionDays['okx'] || '365', 10) * (storageStats['okx'].estimated_per_symbol_per_day_mb || 1)).toFixed(1)
+                          : '0'} MB
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t">
+                    <div className="text-sm font-medium mb-2">{t('settings.setRetention', 'Set Retention Period')}</div>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" min={1} max={3650} value={retentionDays['okx'] || '365'}
+                        onChange={(e) => setRetentionDays(prev => ({ ...prev, okx: e.target.value }))}
+                        className="w-28 h-8 text-sm" />
+                      <span className="text-sm text-muted-foreground">{t('settings.days', 'days')}</span>
+                      <Button variant="outline" size="sm" onClick={handleSaveRetention} disabled={retentionSaving}>{t('common.save', 'Save')}</Button>  {/* [OKX 修复] handleSetRetention → handleSaveRetention */}
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t">
+                    <div className="text-sm font-medium mb-3">{t('settings.dataCoverageHeatmap', 'Data Coverage Heatmap')}</div>
+                    <DataCoverageHeatmap exchange="okx" dataType="market_flow" />
+                  </div>
+                  <div className="pt-4 border-t">
+                    <div className="text-sm font-medium mb-3">{t('settings.klineCoverage', 'K-line Coverage')}</div>
+                    <DataCoverageHeatmap exchange="okx" dataType="klines" />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

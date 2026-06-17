@@ -43,14 +43,22 @@ const BinanceLogo = ({ className = '' }: { className?: string }) => (
   <img src="/static/binance_logo.svg" alt="Binance" width="16" height="16" className={className} />
 )
 
+const OkxLogo = ({ className = '' }: { className?: string }) => (
+  <img src="/static/okx_logo.svg" alt="OKX" width="16" height="16" className={className} />
+)
+
 // Exchange badge component
 const ExchangeBadge = ({ exchange, size = 'sm' }: { exchange: string; size?: 'sm' | 'xs' }) => {
   const isHyperliquid = exchange === 'hyperliquid'
+  const isOkx = exchange === 'okx'
   const textSize = size === 'xs' ? 'text-[10px]' : 'text-xs'
+  const colorClass = isHyperliquid ? 'bg-emerald-500/10 text-emerald-400' : isOkx ? 'bg-blue-500/10 text-blue-400' : 'bg-yellow-500/10 text-yellow-400'
+  const logo = isHyperliquid ? <HyperliquidLogo /> : isOkx ? <OkxLogo /> : <BinanceLogo />
+  const label = isHyperliquid ? 'Hyperliquid' : isOkx ? 'OKX' : 'Binance'
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${isHyperliquid ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
-      {isHyperliquid ? <HyperliquidLogo /> : <BinanceLogo />}
-      <span className={textSize}>{isHyperliquid ? 'Hyperliquid' : 'Binance'}</span>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${colorClass}`}>
+      {logo}
+      <span className={textSize}>{label}</span>
     </span>
   )
 }
@@ -717,9 +725,11 @@ export default function SignalManager() {
   // Load watchlist symbols
   const loadWatchlist = async (exchange: string = 'hyperliquid') => {
     try {
-      const endpoint = exchange === 'binance'
-        ? '/api/binance/symbols/watchlist'
-        : '/api/hyperliquid/symbols/watchlist'
+      const endpoint = exchange === 'hyperliquid'
+        ? '/api/hyperliquid/symbols/watchlist'
+        : exchange === 'okx'
+          ? '/api/okx/symbols/watchlist'  // [OKX 修复] 之前错误路由到 Binance
+          : '/api/binance/symbols/watchlist'
       const res = await fetch(endpoint)
       if (res.ok) {
         const data = await res.json()
@@ -2096,8 +2106,8 @@ export default function SignalManager() {
                 <SelectTrigger>
                   <SelectValue>
                     <span className="flex items-center gap-2">
-                      {signalForm.exchange === 'hyperliquid' ? <HyperliquidLogo /> : <BinanceLogo />}
-                      {signalForm.exchange === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                      {signalForm.exchange === 'hyperliquid' ? <HyperliquidLogo /> : signalForm.exchange === 'okx' ? <OkxLogo /> : <BinanceLogo />}
+                      {signalForm.exchange === 'hyperliquid' ? 'Hyperliquid' : signalForm.exchange === 'okx' ? 'OKX' : 'Binance'}
                     </span>
                   </SelectValue>
                 </SelectTrigger>
@@ -2107,6 +2117,9 @@ export default function SignalManager() {
                   </SelectItem>
                   <SelectItem value="binance">
                     <span className="flex items-center gap-2"><BinanceLogo />Binance</span>
+                  </SelectItem>
+                  <SelectItem value="okx">
+                    <span className="flex items-center gap-2"><OkxLogo />OKX</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -2589,8 +2602,8 @@ export default function SignalManager() {
                   <SelectTrigger>
                     <SelectValue>
                       <span className="flex items-center gap-2">
-                        {poolForm.exchange === 'hyperliquid' ? <HyperliquidLogo /> : <BinanceLogo />}
-                        {poolForm.exchange === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                        {poolForm.exchange === 'hyperliquid' ? <HyperliquidLogo /> : poolForm.exchange === 'okx' ? <OkxLogo /> : <BinanceLogo />}
+                        {poolForm.exchange === 'hyperliquid' ? 'Hyperliquid' : poolForm.exchange === 'okx' ? 'OKX' : 'Binance'}
                       </span>
                     </SelectValue>
                   </SelectTrigger>
@@ -2600,6 +2613,9 @@ export default function SignalManager() {
                     </SelectItem>
                     <SelectItem value="binance">
                       <span className="flex items-center gap-2"><BinanceLogo />Binance</span>
+                    </SelectItem>
+                    <SelectItem value="okx">
+                      <span className="flex items-center gap-2"><OkxLogo />OKX</span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -2652,7 +2668,7 @@ export default function SignalManager() {
                               {signal.signal_name}
                               {isDisabled && (
                                 <span className="inline-flex items-center" title={`${signal.exchange} signal`}>
-                                  {signal.exchange === 'binance' ? <BinanceLogo /> : <HyperliquidLogo />}
+                                  {signal.exchange === 'hyperliquid' ? <HyperliquidLogo /> : signal.exchange === 'okx' ? <OkxLogo /> : <BinanceLogo />}
                                 </span>
                               )}
                             </span>

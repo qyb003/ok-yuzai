@@ -1,0 +1,27 @@
+"use client";
+
+// src/primitives/thread/ThreadViewportFooter.tsx
+import { useComposedRefs } from "@radix-ui/react-compose-refs";
+import { Primitive } from "@radix-ui/react-primitive";
+import {
+  forwardRef,
+  useCallback
+} from "react";
+import { useSizeHandle } from "../../utils/hooks/useSizeHandle.js";
+import { useThreadViewport } from "../../context/react/ThreadViewportContext.js";
+import { jsx } from "react/jsx-runtime";
+var ThreadPrimitiveViewportFooter = forwardRef((props, forwardedRef) => {
+  const register = useThreadViewport((s) => s.registerContentInset);
+  const getHeight = useCallback((el) => {
+    const marginTop = parseFloat(getComputedStyle(el).marginTop) || 0;
+    return el.offsetHeight + marginTop;
+  }, []);
+  const resizeRef = useSizeHandle(register, getHeight);
+  const ref = useComposedRefs(forwardedRef, resizeRef);
+  return /* @__PURE__ */ jsx(Primitive.div, { ...props, ref });
+});
+ThreadPrimitiveViewportFooter.displayName = "ThreadPrimitive.ViewportFooter";
+export {
+  ThreadPrimitiveViewportFooter
+};
+//# sourceMappingURL=ThreadViewportFooter.js.map

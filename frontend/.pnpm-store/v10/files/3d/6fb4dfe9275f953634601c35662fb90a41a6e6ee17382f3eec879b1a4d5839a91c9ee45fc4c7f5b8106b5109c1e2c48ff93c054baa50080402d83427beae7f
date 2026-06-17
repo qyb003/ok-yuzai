@@ -1,0 +1,1 @@
+{"version":3,"file":"createObjectStream.d.ts","names":[],"sources":["../../../src/core/object/createObjectStream.ts"],"mappings":";;;;KAKK,sBAAA;EAAA,SACM,WAAA,EAAa,WAAA;EAEtB,OAAA,CAAQ,UAAA,WAAqB,qBAAqB;AAAA;AAAA,KAwD/C,yBAAA;EACH,OAAA,GAAU,UAAA,EAAY,sBAAA,YAAkC,WAAA;EACxD,YAAA,GAAe,iBAAA;AAAA;AAAA,cAGJ,kBAAA;EAAsB,OAAA;EAAA;AAAA,GAGhC,yBAAA,KAAyB,cAAA,CAAA,iBAAA"}

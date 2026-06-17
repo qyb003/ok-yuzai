@@ -8,6 +8,22 @@ import type { HyperliquidBalance } from '@/lib/types/hyperliquid';
 import { formatDateTime } from '@/lib/dateTime';
 import type { ExchangeType } from './WalletSelector';
 
+// [OKX 新增] OKX 余额获取函数（字段名归一化为 camelCase 匹配 BalanceCard 期望格式）
+async function getOkxBalance(accountId: number, environment: string) {
+  const res = await fetch(`/api/okx/accounts/${accountId}/balance?environment=${environment}`)
+  if (!res.ok) throw new Error('Failed to fetch OKX balance')
+  const data = await res.json()
+  const b = data.balance || {}
+  return {
+    totalEquity: b.total_equity ?? 0,
+    availableBalance: b.available_balance ?? 0,
+    usedMargin: b.used_margin ?? 0,
+    unrealizedPnl: b.unrealized_pnl ?? 0,
+    marginUsagePercent: b.margin_usage_percent ?? 0,
+    maintenanceMargin: b.maintenance_margin ?? 0,
+  }
+}
+
 interface BalanceCardProps {
   accountId: number;
   environment: 'testnet' | 'mainnet';
@@ -71,8 +87,11 @@ export default function BalanceCard({
         setIsInitialLoading(true);
       }
       setError(null);
+      // [OKX 修复] 三方交易所分发
       const data = exchange === 'hyperliquid'
         ? await getHyperliquidBalance(accountId, environment)
+        : exchange === 'okx'
+        ? await getOkxBalance(accountId, environment)
         : await getBinanceBalance(accountId, environment);
       setBalance(data);
       setHasLoaded(true);
@@ -127,7 +146,7 @@ export default function BalanceCard({
   return (
     <Card className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">{exchange === 'binance' ? 'Binance' : 'Hyperliquid'} Account Status</h2>
+        <h2 className="text-xl font-bold">{exchange === 'hyperliquid' ? 'Hyperliquid' : exchange === 'okx' ? 'OKX' : 'Binance'} Account Status</h2>
         <Badge
           variant={environment === 'testnet' ? 'default' : 'destructive'}
           className="uppercase"
@@ -145,20 +164,20 @@ export default function BalanceCard({
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-600">Total Equity</span>
-          <span className="text-xl font-bold">${balance.totalEquity.toFixed(2)} USDC</span>
+          <span className="text-xl font-bold">${(balance.totalEquity ?? 0).toFixed(2)} USDC</span>
         </div>
 
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-600">Available Balance</span>
           <span className="text-lg font-semibold text-green-600">
-            ${balance.availableBalance.toFixed(2)}
+            ${(balance.availableBalance ?? 0).toFixed(2)}
           </span>
         </div>
 
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-600">Used Margin</span>
           <span className="text-lg font-semibold text-gray-700">
-            ${balance.usedMargin.toFixed(2)}
+            ${(balance.usedMargin ?? 0).toFixed(2)}
           </span>
         </div>
       </div>
@@ -166,8 +185,8 @@ export default function BalanceCard({
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-sm font-medium">Margin Usage</span>
-          <span className={`text-sm font-bold ${calculateMarginUsageColor(balance.marginUsagePercent)}`}>
-            {balance.marginUsagePercent.toFixed(1)}%
+          <span className={`text-sm font-bold ${calculateMarginUsageColor(balance.marginUsagePercent ?? 0)}`}>
+            {(balance.marginUsagePercent ?? 0).toFixed(1)}%
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">

@@ -267,9 +267,13 @@ def place_ai_driven_crypto_order(max_ratio: float = 0.2, account_ids: Optional[I
             try:
                 logger.info(f"Processing AI trading for account: {account.name}")
 
-                # All accounts now use Hyperliquid trading pipeline
-                logger.info(f"Processing Hyperliquid trading for account {account.name}")
-                place_ai_driven_hyperliquid_order(account_id=account.id)
+                # [OKX 修改] 按账户关联的交易所分发
+                exchange = getattr(account, 'exchange', 'hyperliquid') or 'hyperliquid'
+                logger.info(f"Processing {exchange} trading for account {account.name}")
+                if exchange == "okx":
+                    place_ai_driven_okx_order(account_id=account.id)
+                else:
+                    place_ai_driven_hyperliquid_order(account_id=account.id)
 
             except Exception as account_err:
                 logger.error(f"AI-driven order placement failed for account {account.name}: {account_err}", exc_info=True)
@@ -1762,3 +1766,324 @@ def _execute_binance_decision(
 
 
 BINANCE_TRADE_JOB_ID = "binance_ai_trade"
+
+# [OKX 新增] OKX AI 自动交易入口
+def place_ai_driven_okx_order(
+    account_ids: Optional[Iterable[int]] = None,
+    account_id: Optional[int] = None,
+    bypass_auto_trading: bool = False,
+    trigger_context: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Place OKX perpetual contract order based on AI decision.
+
+    功能与 place_ai_driven_binance_order 一致，但使用 OKX 客户端。
+    支持模拟盘 (testnet) 和实盘 (mainnet) 环境隔离。
+    """
+    from services.okx_trading_client import OkxTradingClient
+    from database.models import OkxWallet
+
+    # 获取账户列表
+    accounts = []
+    db = SessionLocal()
+    try:
+        if account_id is not None:
+            account = db.query(Account).filter(
+                Account.id == account_id, Account.is_deleted != True
+            ).first()
+            if not account or account.is_active != "true":
+                logger.debug(f"Account {account_id} not found or inactive")
+                return
+            if not bypass_auto_trading and getattr(account, "auto_trading_enabled", "false") != "true":
+                logger.debug(f"Account {account_id} auto trading disabled - skipping OKX AI order")
+                return
+            accounts = [account]
+        else:
+            accounts = db.query(Account).filter(
+                Account.is_active == "true",
+                Account.auto_trading_enabled == "true",
+                Account.is_deleted != True,
+            ).all()
+            if not accounts:
+                logger.debug("No active accounts with auto trading enabled")
+                return
+            if account_ids is not None:
+                id_set = {int(acc_id) for acc_id in account_ids}
+                accounts = [acc for acc in accounts if acc.id in id_set]
+    finally:
+        db.close()
+
+    # 获取市场行情
+    prices = {}
+    for sym in ["BTC", "ETH", "SOL", "DOGE", "XRP", "ADA", "AVAX", "LINK"]:
+        try:
+            price = get_last_price(sym, market="crypto")
+            if price:
+                prices[sym] = price
+        except Exception as e:
+            logger.warning(f"[OKX] Failed to get price for {sym}: {e}")
+
+    if not prices:
+        logger.warning("[OKX] Failed to fetch market prices, skipping trading")
+        return
+
+    # 处理每个账户
+    for account in accounts:
+        db = SessionLocal()
+        try:
+            from services.hyperliquid_environment import get_global_trading_mode
+            environment = get_global_trading_mode(db)
+            if not environment:
+                logger.info(f"[OKX] AI Trader '{account.name}' skipped - No trading environment configured")
+                continue
+
+            # [OKX] 查询 OKX 钱包
+            wallet = db.query(OkxWallet).filter(
+                OkxWallet.account_id == account.id,
+                OkxWallet.environment == environment,
+                OkxWallet.is_active == "true",
+            ).first()
+
+            if not wallet or not wallet.api_key_encrypted:
+                logger.info(f"[OKX] AI Trader '{account.name}' skipped - OKX wallet not configured.")
+                continue
+
+            # [OKX] 解密凭证并创建客户端
+            from utils.encryption import decrypt_private_key
+            api_key = decrypt_private_key(wallet.api_key_encrypted)
+            secret_key = decrypt_private_key(wallet.secret_key_encrypted)
+            passphrase = decrypt_private_key(wallet.passphrase_encrypted)
+
+            client = OkxTradingClient(
+                api_key=api_key,
+                secret_key=secret_key,
+                passphrase=passphrase,
+                environment=wallet.environment or "testnet",
+            )
+
+            decision_kwargs = {"wallet_address": str(wallet.id), "exchange": "okx"}
+
+            # 获取账户状态
+            try:
+                account_state = client.get_account_state(db)
+                available_balance = account_state["available_balance"]
+                total_equity = account_state["total_equity"]
+                logger.info(
+                    f"[OKX] Account state for {account.name}: "
+                    f"equity=${total_equity:.2f}, available=${available_balance:.2f}"
+                )
+            except Exception as e:
+                logger.error(f"[OKX] Failed to get account state for {account.name}: {e}")
+                continue
+
+            # 获取持仓
+            try:
+                positions = client.get_positions(include_timing=True)
+                logger.info(f"[OKX] Account {account.name} has {len(positions)} open positions")
+            except Exception as e:
+                logger.error(f"[OKX] Failed to get positions for {account.name}: {e}")
+                positions = []
+
+            if total_equity <= 0 and len(positions) == 0:
+                logger.warning(f"[OKX] Account {account.name} skipped - No balance to trade!")
+                continue
+
+            # 构建 portfolio
+            portfolio = {
+                "cash": available_balance,
+                "frozen_cash": account_state.get("used_margin", 0),
+                "positions": {},
+                "total_assets": total_equity,
+            }
+            for pos in positions:
+                symbol = pos["coin"]
+                portfolio["positions"][symbol] = {
+                    "quantity": pos["szi"],
+                    "avg_cost": pos["entry_px"],
+                    "current_value": pos["position_value"],
+                    "unrealized_pnl": pos["unrealized_pnl"],
+                    "leverage": pos["leverage"],
+                }
+
+            okx_state = {
+                "total_equity": total_equity,
+                "available_balance": available_balance,
+                "used_margin": account_state.get("used_margin", 0),
+                "margin_usage_percent": account_state.get("margin_usage_percent", 0),
+                "positions": positions,
+            }
+
+            # [OKX] 调用 AI 做决策（复用现有 call_ai_for_decision）
+            decisions = call_ai_for_decision(
+                db,
+                account,
+                portfolio,
+                prices,
+                symbols=list(prices.keys()),
+                hyperliquid_state=okx_state,
+                trigger_context=trigger_context,
+                exchange="okx",
+            )
+
+            if not decisions:
+                logger.info(f"[OKX] No AI decisions for account {account.name}")
+                continue
+
+            # [OKX] 执行 AI 决策（复用 _execute_binance_decision 的逻辑）
+            for decision in decisions:
+                _execute_okx_decision(
+                    db, account, client, decision, portfolio, positions, prices,
+                    available_balance=available_balance,
+                    max_leverage=wallet.max_leverage or 20,
+                    default_leverage=wallet.default_leverage or 5,
+                    decision_kwargs=decision_kwargs,
+                    wallet=wallet,
+                )
+
+        except Exception as e:
+            logger.error(f"[OKX] Error processing account {account.name}: {e}", exc_info=True)
+            db.rollback()
+        finally:
+            db.close()
+
+
+def _execute_okx_decision(
+    db: Session,
+    account: Account,
+    client,
+    decision: Dict[str, Any],
+    portfolio: Dict[str, Any],
+    positions: List[Dict[str, Any]],
+    prices: Dict[str, float],
+    available_balance: float = 0.0,
+    max_leverage: int = 20,
+    default_leverage: int = 5,
+    decision_kwargs: Optional[Dict[str, Any]] = None,
+    wallet=None,
+) -> None:
+    """
+    [OKX 新增] 执行单个 AI 决策 — OKX 版本。
+
+    与 _execute_binance_decision 使用相同的逻辑结构，
+    但调用 OKX 客户端的 place_order_with_tpsl 方法。
+    """
+    if decision_kwargs is None:
+        decision_kwargs = {}
+
+    operation = decision.get("operation", "").lower()
+    symbol = decision.get("symbol", "").upper() if decision.get("symbol") else ""
+    target_portion = float(decision.get("target_portion_of_balance", 0))
+    leverage = int(decision.get("leverage", default_leverage))
+    reason = decision.get("reason", "No reason provided")
+    take_profit_price = decision.get("take_profit_price")
+    stop_loss_price = decision.get("stop_loss_price")
+
+    logger.info(
+        f"[OKX] AI decision for {account.name}: {operation} {symbol} "
+        f"(portion: {target_portion:.2%}, leverage: {leverage}x) - {reason}"
+    )
+
+    # 1. 校验操作类型
+    if operation not in ["buy", "sell", "hold", "close"]:
+        logger.warning(f"[OKX] Invalid operation '{operation}' from AI for {account.name}")
+        save_ai_decision(db, account, decision, portfolio, executed=False, **decision_kwargs)
+        return
+
+    # 2. HOLD 无操作
+    if operation == "hold":
+        logger.info(f"[OKX] AI decided to HOLD for {account.name} - no action taken")
+        save_ai_decision(db, account, decision, portfolio, executed=True, **decision_kwargs)
+        return
+
+    # 3. 校验 symbol
+    if not symbol:
+        logger.warning(f"[OKX] No symbol provided in decision for {account.name}")
+        save_ai_decision(db, account, decision, portfolio, executed=False, **decision_kwargs)
+        return
+
+    # 4. 校验杠杆范围
+    if leverage < 1 or leverage > max_leverage:
+        logger.warning(
+            f"[OKX] Invalid leverage {leverage}x from AI (max: {max_leverage}x), "
+            f"using default {default_leverage}x"
+        )
+        leverage = default_leverage
+
+    # 5. 获取行情价格
+    price = prices.get(symbol, 0)
+    if not price or price <= 0:
+        logger.warning(f"[OKX] Invalid price for {symbol} for {account.name}")
+        save_ai_decision(db, account, decision, portfolio, executed=False, **decision_kwargs)
+        return
+
+    order_result = None
+
+    try:
+        if operation == "buy" or operation == "sell":
+            if target_portion <= 0 or target_portion > 1:
+                logger.warning(f"[OKX] Invalid target_portion {target_portion} from AI for {account.name}")
+                save_ai_decision(db, account, decision, portfolio, executed=False, **decision_kwargs)
+                return
+
+            margin = available_balance * target_portion
+            order_value = margin * leverage
+            quantity = round(order_value / price, 6)
+
+            logger.info(
+                f"[OKX] Position sizing for {symbol}: "
+                f"margin=${margin:.2f}, leverage={leverage}x, "
+                f"position_value=${order_value:.2f}, quantity={quantity}"
+            )
+
+            order_result = client.place_order_with_tpsl(
+                db=db,
+                symbol=symbol,
+                is_buy=(operation == "buy"),
+                size=quantity,
+                price=price,
+                leverage=leverage,
+                order_type="MARKET",
+                reduce_only=False,
+                take_profit_price=take_profit_price,
+                stop_loss_price=stop_loss_price,
+            )
+
+        elif operation == "close":
+            result = client.close_position(symbol, cancel_tpsl=True)
+            if result:
+                logger.info(f"[OKX] Position closed: {symbol}")
+                save_ai_decision(
+                    db, account, decision, portfolio, executed=True,
+                    hyperliquid_order_id=str(result.get("order_id")) if result.get("order_id") else None,
+                    **decision_kwargs,
+                )
+            else:
+                logger.info(f"[OKX] No position to close for {symbol}")
+                save_ai_decision(db, account, decision, portfolio, executed=True, **decision_kwargs)
+            return
+
+        # 保存决策结果
+        if order_result:
+            status = order_result.get("status", "error")
+            executed = status in ["filled", "resting"]
+
+            save_ai_decision(
+                db, account, decision, portfolio,
+                executed=executed,
+                hyperliquid_order_id=str(order_result.get("order_id")) if order_result.get("order_id") else None,
+                tp_order_id=str(order_result.get("tp_order_id")) if order_result.get("tp_order_id") else None,
+                sl_order_id=str(order_result.get("sl_order_id")) if order_result.get("sl_order_id") else None,
+                **decision_kwargs,
+            )
+
+            if executed:
+                logger.info(
+                    f"[OKX] {operation.upper()} order executed: {symbol} "
+                    f"order_id={order_result.get('order_id')} "
+                    f"tp_id={order_result.get('tp_order_id')} sl_id={order_result.get('sl_order_id')}"
+                )
+            else:
+                logger.warning(f"[OKX] {operation.upper()} order failed: {order_result}")
+
+    except Exception as e:
+        logger.error(f"[OKX] Error executing {operation} for {symbol}: {e}", exc_info=True)
+        save_ai_decision(db, account, decision, portfolio, executed=False, **decision_kwargs)

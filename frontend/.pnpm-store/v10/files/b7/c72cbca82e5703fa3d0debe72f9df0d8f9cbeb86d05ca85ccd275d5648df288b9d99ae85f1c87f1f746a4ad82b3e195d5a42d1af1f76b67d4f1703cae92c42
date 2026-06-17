@@ -1,0 +1,68 @@
+"use client";
+
+// src/primitives/message/MessageRoot.tsx
+import { Primitive } from "@radix-ui/react-primitive";
+import {
+  forwardRef,
+  useCallback
+} from "react";
+import { useAssistantApi, useAssistantState } from "../../context/index.js";
+import { useManagedRef } from "../../utils/hooks/useManagedRef.js";
+import { useSizeHandle } from "../../utils/hooks/useSizeHandle.js";
+import { useComposedRefs } from "@radix-ui/react-compose-refs";
+import { useThreadViewport } from "../../context/react/ThreadViewportContext.js";
+import { ThreadPrimitiveViewportSlack } from "../thread/ThreadViewportSlack.js";
+import { jsx } from "react/jsx-runtime";
+var useIsHoveringRef = () => {
+  const api = useAssistantApi();
+  const message = useAssistantState(() => api.message());
+  const callbackRef = useCallback(
+    (el) => {
+      const handleMouseEnter = () => {
+        message.setIsHovering(true);
+      };
+      const handleMouseLeave = () => {
+        message.setIsHovering(false);
+      };
+      el.addEventListener("mouseenter", handleMouseEnter);
+      el.addEventListener("mouseleave", handleMouseLeave);
+      if (el.matches(":hover")) message.setIsHovering(true);
+      return () => {
+        el.removeEventListener("mouseenter", handleMouseEnter);
+        el.removeEventListener("mouseleave", handleMouseLeave);
+        message.setIsHovering(false);
+      };
+    },
+    [message]
+  );
+  return useManagedRef(callbackRef);
+};
+var useMessageViewportRef = () => {
+  const turnAnchor = useThreadViewport((s) => s.turnAnchor);
+  const registerUserHeight = useThreadViewport(
+    (s) => s.registerUserMessageHeight
+  );
+  const shouldRegisterAsInset = useAssistantState(
+    ({ thread, message }) => turnAnchor === "top" && message.role === "user" && message.index === thread.messages.length - 2 && thread.messages.at(-1)?.role === "assistant"
+  );
+  const getHeight = useCallback((el) => el.offsetHeight, []);
+  return useSizeHandle(
+    shouldRegisterAsInset ? registerUserHeight : null,
+    getHeight
+  );
+};
+var MessagePrimitiveRoot = forwardRef((props, forwardRef2) => {
+  const isHoveringRef = useIsHoveringRef();
+  const anchorUserMessageRef = useMessageViewportRef();
+  const ref = useComposedRefs(
+    forwardRef2,
+    isHoveringRef,
+    anchorUserMessageRef
+  );
+  return /* @__PURE__ */ jsx(ThreadPrimitiveViewportSlack, { children: /* @__PURE__ */ jsx(Primitive.div, { ...props, ref }) });
+});
+MessagePrimitiveRoot.displayName = "MessagePrimitive.Root";
+export {
+  MessagePrimitiveRoot
+};
+//# sourceMappingURL=MessageRoot.js.map

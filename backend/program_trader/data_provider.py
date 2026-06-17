@@ -109,7 +109,7 @@ class DataProvider:
         self.environment = environment
         self.trading_client = trading_client
         self.record_queries = record_queries
-        self.exchange = exchange  # "hyperliquid" or "binance"
+        self.exchange = exchange  # "hyperliquid", "binance", or "okx"
         self._query_log: List[Dict[str, Any]] = []
         self._kline_cache: Dict[str, List[Kline]] = {}
         self._account_cache: Optional[Dict[str, Any]] = None

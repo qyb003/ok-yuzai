@@ -6,25 +6,25 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 const TIPS_ZH = [
-  '遇到任何问题？直接问 Hyper AI，它了解你的所有配置和运行状态',
-  'Testnet 仅用于熟悉操作流程，其价格、K线和交易量与实盘完全不同，不要在测试网验证交易策略',
-  '点击任意 AI Trader 的决策记录，可以查看完整的 AI 推理过程和市场数据快照',
-  '别忘了设置你的 Watchlist — AI 只能分析和交易 Watchlist 中的币种',
-  '信号池可以 7×24 小时自动监控市场，发现异动时触发 AI Trader 决策',
-  '在 Factor Library 中点击图表按钮，可以查看每个因子的 IC 曲线和有效性评估',
-  'AI Trader 支持定时触发和信号触发两种模式，可以根据策略特点选择',
-  'Hyper AI 输入 /health 可以一键执行系统健康检查，快速发现配置问题',
-  '每个 AI Trader 都可以独立设置不同的 LLM 模型、Prompt 和触发间隔',
-  '决策归因分析可以帮你理解 AI 为什么做出某个交易决策，以及哪些因素影响最大',
-  'Program 模式使用代码逻辑执行交易，适合有明确规则的策略，不消耗 LLM 额度',
-  '绑定 Telegram 或 Discord 机器人，可以实时接收 AI 交易通知',
-  '多账户模式下，不同 AI Trader 可以绑定不同钱包，互不干扰地运行各自策略',
-  'Mainnet 交易使用真实资金，建议从小仓位开始，观察 AI 表现后再逐步加仓',
-  'Prompt 回测功能可以用历史数据模拟 AI 决策，在投入真金白银之前先验证想法',
-  'Hyper AI 不仅能回答问题，还能直接帮你创建 Trader、修改配置、执行诊断',
-  'DeepSeek 和 Qwen 模型免费且中文能力强，适合入门；Claude 和 GPT 推理更精细，适合复杂策略',
-  '不同 LLM 对同一市场数据可能做出不同决策 — 可以用多个 Trader 对比模型表现',
-  'AI Trader 的触发间隔建议不低于 5 分钟，过于频繁会增加 API 成本但不一定提升收益',
+  '1遇到任何问题？直接问 Hyper AI，它了解你的所有配置和运行状态',
+  '1Testnet 仅用于熟悉操作流程，其价格、K线和交易量与实盘完全不同，不要在测试网验证交易策略',
+  '1点击任意 AI Trader 的决策记录，可以查看完整的 AI 推理过程和市场数据快照',
+  '1别忘了设置你的 Watchlist — AI 只能分析和交易 Watchlist 中的币种',
+  '1信号池可以 7×24 小时自动监控市场，发现异动时触发 AI Trader 决策',
+  '1在 Factor Library 中点击图表按钮，可以查看每个因子的 IC 曲线和有效性评估',
+  '1AI Trader 支持定时触发和信号触发两种模式，可以根据策略特点选择',
+  '1Hyper AI 输入 /health 可以一键执行系统健康检查，快速发现配置问题',
+  '1每个 AI Trader 都可以独立设置不同的 LLM 模型、Prompt 和触发间隔',
+  '1决策归因分析可以帮你理解 AI 为什么做出某个交易决策，以及哪些因素影响最大',
+  '1Program 模式使用代码逻辑执行交易，适合有明确规则的策略，不消耗 LLM 额度',
+  '1绑定 Telegram 或 Discord 机器人，可以实时接收 AI 交易通知',
+  '1多账户模式下，不同 AI Trader 可以绑定不同钱包，互不干扰地运行各自策略',
+  '1Mainnet 交易使用真实资金，建议从小仓位开始，观察 AI 表现后再逐步加仓',
+  '1Prompt 回测功能可以用历史数据模拟 AI 决策，在投入真金白银之前先验证想法',
+  '1Hyper AI 不仅能回答问题，还能直接帮你创建 Trader、修改配置、执行诊断',
+  '1DeepSeek 和 Qwen 模型免费且中文能力强，适合入门；Claude 和 GPT 推理更精细，适合复杂策略',
+  '1不同 LLM 对同一市场数据可能做出不同决策 — 可以用多个 Trader 对比模型表现',
+  '1AI Trader 的触发间隔建议不低于 5 分钟，过于频繁会增加 API 成本但不一定提升收益',
 ]
 
 const TIPS_EN = [
@@ -39,7 +39,7 @@ const TIPS_EN = [
   'Each AI Trader can have its own LLM model, Prompt, and trigger interval — fully independent',
   'Decision Attribution Analysis helps you understand why AI made a trade and which factors mattered most',
   'Program mode executes trades with code logic — ideal for rule-based strategies without LLM costs',
-  'Connect Telegram or Discord bots to receive real-time AI trading notifications',
+  'Connect Telegram or Discord bots to receive real-time AI trading notifications22222222222222222222222',
   'In multi-account mode, different AI Traders can bind to different wallets and run independently',
   'Mainnet uses real funds — start with small positions and scale up after observing AI performance',
   'Prompt Backtest lets you simulate AI decisions on historical data before committing real capital',
@@ -114,7 +114,7 @@ export default function SplashScreen({ onComplete, minDuration = 1500, isReady =
           />
         </div>
         <p className="text-sm text-muted-foreground italic text-center px-4" style={{ maxWidth: '800px' }}>
-          💡 {tip}
+          💡 11111{tip}
         </p>
       </div>
     </div>

@@ -32,13 +32,13 @@ export function ExchangeProvider({ children }: ExchangeProviderProps) {
         const response = await fetch('/api/users/exchange-config');
         if (response.ok) {
           const data = await response.json();
-          if (data.selected_exchange && ['hyperliquid', 'binance', 'aster'].includes(data.selected_exchange)) {
+          if (data.selected_exchange && ['hyperliquid', 'binance', 'aster', 'okx'].includes(data.selected_exchange)) {  // [OKX 新增]
             setCurrentExchange(data.selected_exchange as ExchangeId);
           }
         } else {
           // Fallback to localStorage if backend fails
           const stored = localStorage.getItem(STORAGE_KEY);
-          if (stored && ['hyperliquid', 'binance', 'aster'].includes(stored)) {
+          if (stored && ['hyperliquid', 'binance', 'aster', 'okx'].includes(stored)) {  // [OKX 新增]
             setCurrentExchange(stored as ExchangeId);
           }
         }
@@ -47,7 +47,7 @@ export function ExchangeProvider({ children }: ExchangeProviderProps) {
         // Fallback to localStorage
         try {
           const stored = localStorage.getItem(STORAGE_KEY);
-          if (stored && ['hyperliquid', 'binance', 'aster'].includes(stored)) {
+          if (stored && ['hyperliquid', 'binance', 'aster', 'okx'].includes(stored)) {  // [OKX 新增]
             setCurrentExchange(stored as ExchangeId);
           }
         } catch (localError) {
@@ -90,6 +90,22 @@ export function ExchangeProvider({ children }: ExchangeProviderProps) {
       referralLink: 'https://www.binance.com/en/join?ref=HYPERSVIP',
       buttonText: 'Register First',
       buttonVariant: 'outline'
+    },
+    // [OKX 新增] OKX 交易所对象
+    {
+      id: 'okx',
+      name: 'OKX',
+      displayName: 'OKX',
+      selectable: true,
+      selected: currentExchange === 'okx',
+      apiSupported: true,
+      comingSoon: false,
+      logo: '/static/okx_logo.svg',
+      description: '#2 Global CEX by Volume',
+      features: ['KYC Required', 'Deep Liquidity', 'Demo Trading Available'],
+      referralLink: 'https://www.okx.com/join/YOUR_REFERRAL',
+      buttonText: 'Open Futures',
+      buttonVariant: 'default'
     },
     {
       id: 'aster',

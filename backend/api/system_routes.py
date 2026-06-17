@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 # Config keys
 HYPERLIQUID_RETENTION_KEY = "hyperliquid_retention_days"
 BINANCE_RETENTION_KEY = "binance_retention_days"
+OKX_RETENTION_KEY = "okx_retention_days"  # [OKX 新增]
 DEFAULT_RETENTION_DAYS = 365
 
 
@@ -162,7 +163,7 @@ def get_data_coverage(
     If symbol is provided, returns coverage for that symbol only.
     If symbol is not provided, returns list of available symbols.
     tz_offset: timezone offset in minutes (e.g., -480 for UTC+8)
-    exchange: hyperliquid or binance
+    exchange: hyperliquid, binance, or okx
     data_type: market_flow or klines
     """
     try:
@@ -432,6 +433,26 @@ def get_hyperliquid_backfill_status(db: Session = Depends(get_db)):
     if not task:
         return {"status": "none", "progress": 0}
 
+    return {
+        "task_id": task.id,
+        "symbols": task.symbols.split(",") if task.symbols else [],
+        "status": task.status,
+        "progress": task.progress,
+        "error_message": task.error_message,
+        "created_at": task.created_at.isoformat() if task.created_at else None
+    }
+
+
+# [OKX 新增] OKX 回填状态查询
+@router.get("/okx/backfill/status")
+def get_okx_backfill_status(db: Session = Depends(get_db)):
+    """Get current OKX backfill task status."""
+    from database.models import KlineCollectionTask
+    task = db.query(KlineCollectionTask).filter(
+        KlineCollectionTask.exchange == "okx"
+    ).order_by(KlineCollectionTask.created_at.desc()).first()
+    if not task:
+        return {"status": "none", "progress": 0}
     return {
         "task_id": task.id,
         "symbols": task.symbols.split(",") if task.symbols else [],

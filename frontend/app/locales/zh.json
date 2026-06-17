@@ -744,7 +744,7 @@
     "triggerAiTradingDesc": "将信号绑定到AI账户，条件触发时AI评估并执行"
   },
   "trader": {
-    "title": "AI交易员管理",
+    "title": "AI交易员管理AI交易员管理AI交易员管理AI交易员管理AI交易员管理AI交易员管理AI交易员管理AI交易员管理",
     "subtitle": "管理您的AI交易员并配置交易策略",
     "welcomeTitle": "欢迎使用 Hyper Alpha Arena！",
     "welcomeSubtitle": "让我们设置您的第一个AI交易员",
@@ -1076,6 +1076,13 @@
       "feature2": "高流动性",
       "feature3": "支持测试网",
       "button": "先注册"
+    },
+    "okx": {
+      "description": "全球第二大中心化交易所",
+      "feature1": "需要 KYC",
+      "feature2": "深度流动性",
+      "feature3": "支持模拟盘",
+      "button": "开通合约"
     },
     "data": {
       "kline": "K线",

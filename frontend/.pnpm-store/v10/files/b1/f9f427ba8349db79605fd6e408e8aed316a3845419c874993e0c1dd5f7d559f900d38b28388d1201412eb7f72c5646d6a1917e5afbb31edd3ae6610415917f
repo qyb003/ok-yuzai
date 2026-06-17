@@ -1,0 +1,1 @@
+{"version":3,"file":"MessageProvider.d.ts","sourceRoot":"","sources":["../../../src/context/providers/MessageProvider.tsx"],"names":[],"mappings":"AAEA,OAAO,EAAE,KAAK,EAAE,EAAE,KAAK,iBAAiB,EAAE,MAAM,OAAO,CAAC;AAOxD,OAAO,EACL,wBAAwB,EAEzB,MAAM,kCAAkC,CAAC;AAG1C,eAAO,MAAM,eAAe,EAAE,EAAE,CAC9B,iBAAiB,CAAC,wBAAwB,CAAC,CAc5C,CAAC"}

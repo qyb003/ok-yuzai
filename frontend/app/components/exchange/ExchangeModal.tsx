@@ -45,6 +45,16 @@ export default function ExchangeModal({ isOpen, onClose }: ExchangeModalProps) {
       ],
       buttonText: t('exchange.binance.button', 'Register First'),
     },
+    // [OKX 新增]
+    okx: {
+      description: t('exchange.okx.description', '#2 Global CEX by Volume'),
+      features: [
+        t('exchange.okx.feature1', 'KYC Required'),
+        t('exchange.okx.feature2', 'Deep Liquidity'),
+        t('exchange.okx.feature3', 'Demo Trading Available'),
+      ],
+      buttonText: t('exchange.okx.button', 'Open Futures'),
+    },
   }
 
   // Data collection info for each exchange
@@ -72,6 +82,19 @@ export default function ExchangeModal({ isOpen, onClose }: ExchangeModalProps) {
         { label: t('exchange.data.funding', 'Funding Rate'), value: t('exchange.data.realtime', 'Real-time') },
         { label: t('exchange.data.orderbook', 'Orderbook'), value: 'REST 15s' },
       ]
+    },
+    // [OKX 新增]
+    okx: {
+      method: 'REST + WebSocket',
+      icon: Zap,
+      color: 'text-blue-500',
+      items: [
+        { label: t('exchange.data.kline', 'K-line'), value: 'REST' },
+        { label: t('exchange.data.takerVolume', 'Taker Volume'), value: 'REST' },
+        { label: t('exchange.data.oi', 'Open Interest'), value: 'REST' },
+        { label: t('exchange.data.funding', 'Funding Rate'), value: 'REST' },
+        { label: t('exchange.data.orderbook', 'Orderbook'), value: 'REST' },
+      ]
     }
   }
 
@@ -94,8 +117,10 @@ export default function ExchangeModal({ isOpen, onClose }: ExchangeModalProps) {
         {/* Exchange Cards - Only show Hyperliquid and Binance */}
         <div className="p-6">
           <div className="grid gap-6 md:grid-cols-2">
-            {exchanges.filter(ex => ex.id === 'hyperliquid' || ex.id === 'binance').map((exchange) => {
-              const info = dataInfo[exchange.id as 'hyperliquid' | 'binance']
+            {// [OKX] 筛选条件加 okx
+              exchanges.filter(ex => ex.id === 'hyperliquid' || ex.id === 'binance' || ex.id === 'okx').map((exchange) => {
+              // [OKX] 类型断言加 okx
+              const info = dataInfo[exchange.id as 'hyperliquid' | 'binance' | 'okx']
               const DataIcon = info?.icon || Clock
 
               return (

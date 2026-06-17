@@ -1057,6 +1057,13 @@
       "feature3": "Testnet Available",
       "button": "Register First"
     },
+    "okx": {
+      "description": "#2 Global CEX by Volume",
+      "feature1": "KYC Required",
+      "feature2": "Deep Liquidity",
+      "feature3": "Demo Trading Available",
+      "button": "Open Futures"
+    },
     "data": {
       "kline": "K-line",
       "oi": "Open Interest",

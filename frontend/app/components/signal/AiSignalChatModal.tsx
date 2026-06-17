@@ -35,13 +35,22 @@ const BinanceLogo = () => (
   <img src="/static/binance_logo.svg" alt="Binance" width="14" height="14" />
 )
 
+// [OKX 新增] OkxLogo
+const OkxLogo = ({ className = '' }: { className?: string }) => (
+  <img src="/static/okx_logo.svg" alt="OKX" width="16" height="16" className={className} />
+)
+
 const ExchangeBadge = ({ exchange, size = 'sm' }: { exchange: string; size?: 'sm' | 'xs' }) => {
   const isHyperliquid = exchange === 'hyperliquid'
+  const isOkx = exchange === 'okx'  // [OKX 新增]
   const textSize = size === 'xs' ? 'text-[10px]' : 'text-xs'
+  const colorClass = isHyperliquid ? 'bg-emerald-500/10 text-emerald-400' : isOkx ? 'bg-blue-500/10 text-blue-400' : 'bg-yellow-500/10 text-yellow-400'  // [OKX]
+  const Logo = isHyperliquid ? HyperliquidLogo : isOkx ? OkxLogo : BinanceLogo  // [OKX]
+  const label = isHyperliquid ? 'Hyperliquid' : isOkx ? 'OKX' : 'Binance'  // [OKX]
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${isHyperliquid ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
-      {isHyperliquid ? <HyperliquidLogo /> : <BinanceLogo />}
-      <span className={textSize}>{isHyperliquid ? 'Hyperliquid' : 'Binance'}</span>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${colorClass}`}>
+      <Logo />
+      <span className={textSize}>{label}</span>
     </span>
   )
 }

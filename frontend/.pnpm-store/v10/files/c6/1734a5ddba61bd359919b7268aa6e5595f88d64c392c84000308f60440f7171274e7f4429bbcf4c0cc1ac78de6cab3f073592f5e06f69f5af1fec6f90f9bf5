@@ -1,0 +1,33 @@
+"use client";
+
+// src/legacy-runtime/AssistantRuntimeProvider.tsx
+import { memo } from "react";
+import {
+  AssistantProvider,
+  useAssistantApi
+} from "../context/react/AssistantApiContext.js";
+import { RuntimeAdapter } from "./RuntimeAdapter.js";
+import { ThreadPrimitiveViewportProvider } from "../context/providers/ThreadViewportProvider.js";
+import { jsx, jsxs } from "react/jsx-runtime";
+var getRenderComponent = (runtime) => {
+  return runtime._core?.RenderComponent;
+};
+var AssistantRuntimeProviderImpl = ({
+  children,
+  runtime
+}) => {
+  const api = useAssistantApi({
+    threads: RuntimeAdapter(runtime)
+  });
+  const RenderComponent = getRenderComponent(runtime);
+  return /* @__PURE__ */ jsxs(AssistantProvider, { api, children: [
+    RenderComponent && /* @__PURE__ */ jsx(RenderComponent, {}),
+    /* @__PURE__ */ jsx(ThreadPrimitiveViewportProvider, { children })
+  ] });
+};
+var AssistantRuntimeProvider = memo(AssistantRuntimeProviderImpl);
+export {
+  AssistantRuntimeProvider,
+  AssistantRuntimeProviderImpl
+};
+//# sourceMappingURL=AssistantRuntimeProvider.js.map

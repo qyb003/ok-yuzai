@@ -117,7 +117,7 @@ PROMPT_CONTEXT_TOOLS = [
                     },
                     "exchange": {
                         "type": "string",
-                        "enum": ["hyperliquid", "binance"],
+                        "enum": ["hyperliquid", "binance", "okx"],
                         "description": "Exchange to query data from (default: hyperliquid)"
                     }
                 },
@@ -149,7 +149,7 @@ def execute_get_prompt_context(db: Session, prompt_id: Optional[int]) -> str:
     Returns:
         JSON string with prompt info and bound traders
     """
-    from database.models import PromptTemplate, AccountPromptBinding, Account, HyperliquidWallet, BinanceWallet
+    from database.models import PromptTemplate, AccountPromptBinding, Account, HyperliquidWallet, BinanceWallet, OkxWallet  # [OKX]
     from repositories.strategy_repo import get_strategy_by_account, parse_signal_pool_ids
 
     result = {
@@ -258,7 +258,7 @@ def execute_get_trader_details(db: Session, trader_id: int) -> str:
     Returns:
         JSON string with trader config and signal pool details
     """
-    from database.models import Account, HyperliquidWallet, BinanceWallet, AIDecisionLog
+    from database.models import Account, HyperliquidWallet, BinanceWallet, OkxWallet, AIDecisionLog  # [OKX]
     from repositories.strategy_repo import get_strategy_by_account, parse_signal_pool_ids
     from datetime import datetime, timedelta
 

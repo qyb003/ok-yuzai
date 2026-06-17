@@ -1,0 +1,39 @@
+"use client";
+
+// src/primitives/thread/ThreadViewport.tsx
+import { useComposedRefs } from "@radix-ui/react-compose-refs";
+import { Primitive } from "@radix-ui/react-primitive";
+import {
+  forwardRef,
+  useCallback
+} from "react";
+import { useThreadViewportAutoScroll } from "./useThreadViewportAutoScroll.js";
+import { ThreadPrimitiveViewportProvider } from "../../context/providers/ThreadViewportProvider.js";
+import { useSizeHandle } from "../../utils/hooks/useSizeHandle.js";
+import { useThreadViewport } from "../../context/react/ThreadViewportContext.js";
+import { jsx } from "react/jsx-runtime";
+var useViewportSizeRef = () => {
+  const register = useThreadViewport((s) => s.registerViewport);
+  const getHeight = useCallback(
+    (el) => el.clientHeight - parseFloat(getComputedStyle(el).paddingTop),
+    []
+  );
+  return useSizeHandle(register, getHeight);
+};
+var ThreadPrimitiveViewportScrollable = forwardRef(({ autoScroll, children, ...rest }, forwardedRef) => {
+  const autoScrollRef = useThreadViewportAutoScroll({
+    autoScroll
+  });
+  const viewportSizeRef = useViewportSizeRef();
+  const ref = useComposedRefs(forwardedRef, autoScrollRef, viewportSizeRef);
+  return /* @__PURE__ */ jsx(Primitive.div, { ...rest, ref, children });
+});
+ThreadPrimitiveViewportScrollable.displayName = "ThreadPrimitive.ViewportScrollable";
+var ThreadPrimitiveViewport = forwardRef(({ turnAnchor, ...props }, ref) => {
+  return /* @__PURE__ */ jsx(ThreadPrimitiveViewportProvider, { options: { turnAnchor }, children: /* @__PURE__ */ jsx(ThreadPrimitiveViewportScrollable, { ...props, ref }) });
+});
+ThreadPrimitiveViewport.displayName = "ThreadPrimitive.Viewport";
+export {
+  ThreadPrimitiveViewport
+};
+//# sourceMappingURL=ThreadViewport.js.map

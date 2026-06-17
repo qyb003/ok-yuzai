@@ -237,7 +237,7 @@ SIGNAL_TOOLS = [
                     "symbol": {"type": "string", "description": "Trading symbol"},
                     "timestamps": {"type": "array", "items": {"type": "integer"}, "description": "List of trigger timestamps (max 10)"},
                     "time_window": {"type": "string", "description": "K-line interval matching signal time_window"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange to fetch K-lines from. Default: hyperliquid"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange to fetch K-lines from. Default: hyperliquid"}
                 },
                 "required": ["symbol", "timestamps", "time_window"]
             }
@@ -258,7 +258,7 @@ SIGNAL_TOOLS = [
                         "description": "List of indicator names to analyze (max 6). Standard: oi_delta_percent, funding_rate, cvd, depth_ratio, order_imbalance, taker_buy_ratio, taker_volume, price_change, volatility. Factor: use 'factor:<name>' format (e.g., 'factor:RSI21', 'factor:ADX14')."
                     },
                     "time_window": {"type": "string", "enum": ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h"], "description": "Aggregation time window"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange to query data from. Default: hyperliquid"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange to query data from. Default: hyperliquid"}
                 },
                 "required": ["symbol", "indicators", "time_window"]
             }
@@ -291,7 +291,7 @@ SIGNAL_TOOLS = [
                         "description": "List of signal configurations to combine (max 5). For taker_volume, use direction/ratio_threshold/volume_threshold."
                     },
                     "logic": {"type": "string", "enum": ["AND", "OR"], "description": "Combination logic: AND (all must trigger) or OR (any triggers)"},
-                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance"], "description": "Exchange to query data from. Default: hyperliquid"}
+                    "exchange": {"type": "string", "enum": ["hyperliquid", "binance", "okx"], "description": "Exchange to query data from. Default: hyperliquid"}
                 },
                 "required": ["symbol", "signals", "logic"]
             }

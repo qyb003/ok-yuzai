@@ -616,9 +616,9 @@ export function BacktestModal({ open, onOpenChange, binding }: BacktestModalProp
                         <div className="text-xs flex items-center gap-1.5">
                           {new Date(item.created_at).toLocaleString()}
                           <span className={`px-1 py-0.5 rounded text-[9px] font-medium ${
-                            itemExchange === 'hyperliquid' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-yellow-500/15 text-yellow-500'
+                            itemExchange === 'hyperliquid' ? 'bg-emerald-500/15 text-emerald-500' : itemExchange === 'okx' ? 'bg-blue-500/15 text-blue-500' : 'bg-yellow-500/15 text-yellow-500'
                           }`}>
-                            {itemExchange === 'hyperliquid' ? 'HL' : 'BN'}
+                            {itemExchange === 'hyperliquid' ? 'HL' : itemExchange === 'okx' ? 'OKX' : 'BN'}
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -779,9 +779,9 @@ export function BacktestModal({ open, onOpenChange, binding }: BacktestModalProp
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-xs text-muted-foreground">{t('programTrader.dataSource', 'Data Source')}:</span>
               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                currentExchange === 'hyperliquid' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-yellow-500/15 text-yellow-500'
+                currentExchange === 'hyperliquid' ? 'bg-emerald-500/15 text-emerald-500' : currentExchange === 'okx' ? 'bg-blue-500/15 text-blue-500' : 'bg-yellow-500/15 text-yellow-500'
               }`}>
-                {currentExchange === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                {currentExchange === 'hyperliquid' ? 'Hyperliquid' : currentExchange === 'okx' ? 'OKX' : 'Binance'}
               </span>
             </div>
             {/* Stats Cards */}

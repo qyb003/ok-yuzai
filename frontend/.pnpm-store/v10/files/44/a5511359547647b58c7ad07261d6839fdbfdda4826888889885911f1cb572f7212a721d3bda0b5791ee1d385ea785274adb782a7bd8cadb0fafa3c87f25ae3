@@ -1,0 +1,1 @@
+{"version":3,"file":"ThreadListRuntimeClient.d.ts","sourceRoot":"","sources":["../../../src/legacy-runtime/client/ThreadListRuntimeClient.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,iBAAiB,EAAE,MAAM,8BAA8B,CAAC;AAKjE,OAAO,EAEL,mBAAmB,EACpB,MAAM,+BAA+B,CAAC;AACvC,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,6BAA6B,CAAC;AAgBpE,eAAO,MAAM,gBAAgB;;;;;aAKhB,iBAAiB;iCACG,gBAAgB;EA4DhD,CAAC"}
