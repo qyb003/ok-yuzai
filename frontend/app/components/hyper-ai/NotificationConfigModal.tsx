@@ -179,8 +179,9 @@ export default function NotificationConfigModal({
                         className="scale-75 shrink-0"
                       />
                       <img
-                        src={pool.exchange === 'binance' ? '/static/binance_logo.svg' : '/static/hyperliquid_logo.svg'}
-                        alt={pool.exchange === 'binance' ? 'Binance' : 'Hyperliquid'}
+                        // 三分支平权：Hyperliquid / Binance / OKX Logo
+                        src={pool.exchange === 'binance' ? '/static/binance_logo.svg' : pool.exchange === 'okx' ? '/static/okx_logo.svg' : '/static/hyperliquid_logo.svg'}
+                        alt={pool.exchange === 'binance' ? 'Binance' : pool.exchange === 'okx' ? 'OKX' : 'Hyperliquid'}
                         className="w-4 h-4 shrink-0"
                       />
                       <span className="text-xs truncate flex-1" title={pool.pool_name}>{pool.pool_name}</span>

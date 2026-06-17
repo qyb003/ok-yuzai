@@ -621,7 +621,12 @@ class SignalDetectionService:
 
             db = SessionLocal()
             try:
-                market = "binance" if exchange == "binance" else "CRYPTO"
+                if exchange == "binance":
+                    market = "binance"
+                elif exchange == "okx":
+                    market = "okx"
+                else:
+                    market = "CRYPTO"
                 klines = get_kline_data(symbol, market=market, period=period, count=300)
                 if not klines or len(klines) < 30:
                     logger.warning(f"Insufficient K-line data for factor {factor_name}: {symbol}")

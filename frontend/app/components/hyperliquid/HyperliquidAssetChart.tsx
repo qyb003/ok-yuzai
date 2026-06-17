@@ -189,7 +189,8 @@ export default function HyperliquidAssetChart({
 
       const exchange = item.exchange || 'hyperliquid'
       // Create unique curve key: "username (Exchange Name)" for multi-exchange accounts
-      const exchangeName = exchange === 'hyperliquid' ? 'Hyperliquid' : 'Binance'
+      // 三分支平权：Hyperliquid / Binance / OKX
+      const exchangeName = exchange === 'hyperliquid' ? 'Hyperliquid' : exchange === 'okx' ? 'OKX' : 'Binance'
       const curveKey = `${item.username} (${exchangeName})`
       const accountKey = `${item.account_id}_${exchange}`
 
@@ -198,9 +199,12 @@ export default function HyperliquidAssetChart({
 
       if (!accounts.has(accountKey)) {
         const baseLogo = getModelChartLogo(item.username)
-        // Adjust color for Binance to differentiate from Hyperliquid
+        // Adjust color for each exchange to differentiate
+        // 三分支平权：Hyperliquid绿色 / Binance黄色 / OKX蓝色
         const color = exchange === 'binance'
           ? '#F0B90B'  // Binance yellow
+          : exchange === 'okx'
+          ? '#265AFF'  // OKX blue
           : baseLogo.color || getModelColor(item.username)
 
         accounts.set(accountKey, {
@@ -538,7 +542,8 @@ export default function HyperliquidAssetChart({
                   height: badgeSize,
                   borderRadius: '50%',
                   backgroundColor: 'white',
-                  border: `2px solid ${account.exchange === 'binance' ? '#F0B90B' : '#00D395'}`,
+                  // 三分支平权：Hyperliquid绿色 / Binance黄色 / OKX蓝色
+                  border: `2px solid ${account.exchange === 'binance' ? '#F0B90B' : account.exchange === 'okx' ? '#265AFF' : '#00D395'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

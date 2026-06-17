@@ -207,6 +207,41 @@ def get_ticker_data(symbol: str, market: str = "CRYPTO", environment: str = "mai
             logger.error(f"Failed to get ticker data from Binance ({environment}): {e}")
             raise Exception(f"Unable to get ticker data for {key}: {e}")
 
+    # ========================================
+    # OKX 交易所 Ticker 行情数据获取分支
+    # 功能：从 OKX REST API 获取 24h 行情、持仓量、资金费率数据
+    # 数据格式：与 Binance/Hyperliquid 保持完全一致，确保前端无需修改
+    # ========================================
+    elif market.lower() == "okx":
+        try:
+            # 导入 OKX 统一适配器（与 BinanceAdapter 架构一致）
+            from services.exchanges.okx_adapter import OkxAdapter
+            adapter = OkxAdapter(environment=environment)
+            
+            # 第一步：获取 OKX 24小时行情数据（最新价、涨跌幅、成交量等）
+            ticker = adapter.fetch_ticker(symbol)
+            
+            # 第二步：获取 OKX 永续合约持仓量（Open Interest）
+            oi_data = adapter.fetch_open_interest(symbol)
+            
+            # 第三步：获取 OKX 资金费率
+            funding_data = adapter.fetch_funding_rate(symbol)
+            
+            # 统一返回格式（与 Binance 字段完全一致，确保前后端兼容）
+            return {
+                'symbol': symbol,                           # 交易对符号
+                'price': float(ticker.get('last', 0)),      # 最新成交价
+                'oracle_price': float(ticker.get('last', 0)), # 预言机价格（OKX无，用最新价替代）
+                'change24h': float(ticker.get('change24h', 0)),  # 24h价格变动绝对值
+                'volume24h': float(ticker.get('volCcy24h', 0)),  # 24h成交额(USD)
+                'percentage24h': float(ticker.get('change24hPct', 0)),  # 24h涨跌幅(%)
+                'open_interest': float(oi_data.get('oi', 0)) * float(ticker.get('last', 0)) if oi_data else 0,  # 持仓金额(USD)
+                'funding_rate': float(funding_data.get('fundingRate', 0)) if funding_data else 0,  # 当前资金费率
+            }
+        except Exception as e:
+            logger.error(f"OKX 行情数据获取失败 ({environment}): {e}")
+            raise Exception(f"无法获取 {key} 的 ticker 数据: {e}")
+
     try:
         logger.info(f"[DEBUG] Calling get_ticker_data_from_hyperliquid for {symbol} in {environment}")
         ticker_data = get_ticker_data_from_hyperliquid(symbol, environment)

@@ -549,7 +549,12 @@ def _generate_single_preview(
             hyperliquid_state = None
 
     # Determine active symbols + metadata
-    market_param = "binance" if exchange == "binance" else "CRYPTO"
+    if exchange == "binance":
+        market_param = "binance"
+    elif exchange == "okx":
+        market_param = "okx"
+    else:
+        market_param = "CRYPTO"
 
     if exchange == "binance":
         from services.binance_symbol_service import get_selected_symbols as get_binance_selected_symbols

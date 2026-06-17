@@ -119,7 +119,12 @@ class DataProvider:
 
     def _get_market_param(self) -> str:
         """Get market parameter for data services based on exchange."""
-        return "binance" if self.exchange == "binance" else "CRYPTO"
+        if self.exchange == "binance":
+            return "binance"
+        elif self.exchange == "okx":
+            return "okx"
+        else:
+            return "CRYPTO"
 
     def _log_query(self, method: str, args: Dict[str, Any], result: Any) -> None:
         """Record a data query for preview run debugging."""

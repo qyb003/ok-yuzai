@@ -514,7 +514,12 @@ async def evaluate_expression(req: EvaluateRequest):
     """Evaluate a factor expression on-demand (no save required)."""
     from services.market_data import get_kline_data
 
-    market = "binance" if req.exchange == "binance" else "CRYPTO"
+    if req.exchange == "binance":
+        market = "binance"
+    elif req.exchange == "okx":
+        market = "okx"
+    else:
+        market = "CRYPTO"
     klines = get_kline_data(req.symbol, market=market, period=req.period, count=500)
     if not klines or len(klines) < 50:
         return {"status": "error", "error": f"Insufficient K-line data for {req.symbol}"}

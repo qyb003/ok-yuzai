@@ -841,18 +841,34 @@ class ProgramExecutionService:
             order_status = order_result.get('status')
             leverage = decision.leverage if hasattr(decision, 'leverage') else 1
 
-            # Use different field names based on exchange
+            # ========================================
+            # 根据交易所类型使用不同的返回字段名
+            # 说明：各交易所 API 返回的成交数量和成交价格字段名不一致
+            #       Binance/OKX: filled_qty, avg_price
+            #       Hyperliquid: filled_amount, average_price
+            # ========================================
             if exchange == "binance":
-                # Binance uses filled_qty, avg_price
+                # 币安交易所：使用 filled_qty(成交数量) 和 avg_price(成交均价)
                 filled_qty = float(order_result.get('filled_qty', 0))
                 avg_price = float(order_result.get('avg_price', 0))
-                # Fallback to decision values if Binance returns 0
+                # 兜底处理：如果币安返回0，则使用决策中的值
+                decision_qty = float(decision.quantity) if hasattr(decision, 'quantity') else 0
+                decision_price = float(decision.price) if hasattr(decision, 'price') else 0
+                trade_qty = Decimal(str(filled_qty)) if filled_qty > 0 else Decimal(str(decision_qty))
+                trade_price = Decimal(str(avg_price)) if avg_price > 0 else Decimal(str(decision_price))
+            elif exchange == "okx":
+                # ========================================
+                # OKX 交易所：与 Binance 字段名完全一致
+                # 字段映射：filled_qty(成交数量) / avg_price(成交均价)
+                # ========================================
+                filled_qty = float(order_result.get('filled_qty', 0))
+                avg_price = float(order_result.get('avg_price', 0))
                 decision_qty = float(decision.quantity) if hasattr(decision, 'quantity') else 0
                 decision_price = float(decision.price) if hasattr(decision, 'price') else 0
                 trade_qty = Decimal(str(filled_qty)) if filled_qty > 0 else Decimal(str(decision_qty))
                 trade_price = Decimal(str(avg_price)) if avg_price > 0 else Decimal(str(decision_price))
             else:
-                # Hyperliquid uses filled_amount, average_price
+                # Hyperliquid 交易所：使用 filled_amount(成交金额) 和 average_price(均价)
                 trade_qty = Decimal(str(order_result.get('filled_amount', 0)))
                 trade_price = Decimal(str(order_result.get('average_price', 0)))
 
@@ -932,6 +948,19 @@ class ProgramExecutionService:
                 except Exception as e:
                     logger.error(f"[ProgramExecution] Failed to create Binance client: {e}")
                     return False
+            # ========================================
+            # OKX 交易所：创建 OKX 交易客户端
+            # 使用 get_okx_client() 统一入口函数，自动处理 API Key 解密和环境配置
+            # ========================================
+            elif exchange == "okx":
+                try:
+                    from services.okx_environment import get_okx_client
+                    client = get_okx_client(db, binding.account_id, override_environment=environment or "mainnet")
+                    logger.info(f"[ProgramExecution] OKX 交易客户端创建成功，账户ID: {binding.account_id}")
+                except Exception as e:
+                    logger.error(f"[ProgramExecution] OKX 交易客户端创建失败: {e}")
+                    return False
+            # 默认使用 Hyperliquid 交易客户端
             else:
                 client = get_hyperliquid_client(db, binding.account_id, override_environment=environment)
 
@@ -970,10 +999,19 @@ class ProgramExecutionService:
             account_info = client.get_account_state(db)
             available_balance = account_info.get("available_balance", 0)
 
-            # Get real-time market price based on exchange
+            # ========================================
+            # 根据交易所类型获取实时市场价格
+            # Binance/OKX: 使用交易客户端内置的 get_mark_price() 方法
+            # Hyperliquid: 使用独立的行情数据服务
+            # ========================================
             if exchange == "binance":
+                # 币安交易所：通过交易客户端获取标记价格
+                market_price = client.get_mark_price(decision.symbol)
+            elif exchange == "okx":
+                # OKX 交易所：通过交易客户端获取标记价格（与币安方法名一致）
                 market_price = client.get_mark_price(decision.symbol)
             else:
+                # Hyperliquid 交易所：使用独立行情服务获取最新价格
                 from services.hyperliquid_market_data import get_last_price_from_hyperliquid
                 market_price = get_last_price_from_hyperliquid(decision.symbol, environment)
 

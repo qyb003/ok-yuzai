@@ -351,6 +351,9 @@ class HistoricalDataProvider:
         try:
             if self.exchange == "binance":
                 return self._fetch_binance_klines(symbol, period, since_ms, until_ms)
+            elif self.exchange == "okx":
+                # [OKX 新增] OKX K线获取
+                return self._fetch_okx_klines(symbol, period, since_ms, until_ms)
             else:
                 return self._fetch_hyperliquid_klines(symbol, period, since_ms, until_ms)
         except Exception as e:

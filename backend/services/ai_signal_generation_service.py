@@ -1071,7 +1071,12 @@ def _tool_get_indicators_batch(
                     extract_factor_expression,
                 )
 
-                market = "binance" if exchange == "binance" else "CRYPTO"
+                if exchange == "binance":
+                    market = "binance"
+                elif exchange == "okx":
+                    market = "okx"
+                else:
+                    market = "CRYPTO"
                 klines = get_kline_data(symbol.upper(), market=market, period=time_window, count=500)
                 if not klines or len(klines) < 50:
                     results["indicators"][indicator] = {"error": "Insufficient K-line data"}
