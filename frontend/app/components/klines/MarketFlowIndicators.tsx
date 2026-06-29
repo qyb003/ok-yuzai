@@ -19,6 +19,7 @@ interface MarketFlowIndicatorsProps {
   timeframe: string
   selectedIndicator: string
   height?: number
+  exchange?: string  // [OKX 修复] 资金流指标需按交易所查询，默认 hyperliquid
 }
 
 interface IndicatorData {
@@ -52,7 +53,8 @@ export default function MarketFlowIndicators({
   symbol,
   timeframe,
   selectedIndicator,
-  height = 150
+  height = 150,
+  exchange = 'hyperliquid'
 }: MarketFlowIndicatorsProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
@@ -75,7 +77,7 @@ export default function MarketFlowIndicators({
       const startTime = endTime - 7 * 24 * 60 * 60 * 1000 // 7 days
 
       const response = await fetch(
-        `/api/market-flow/indicators?symbol=${symbol}&timeframe=${timeframe}&start_time=${startTime}&end_time=${endTime}&indicators=${selectedIndicator}`
+        `/api/market-flow/indicators?symbol=${symbol}&exchange=${exchange}&timeframe=${timeframe}&start_time=${startTime}&end_time=${endTime}&indicators=${selectedIndicator}`
       )
 
       if (!response.ok) {
@@ -103,7 +105,7 @@ export default function MarketFlowIndicators({
       if (buySeriesRef.current && data.length > 0) {
         const buyData = data.map(d => ({
           time: d.time,
-          value: d.buy || 0,
+          value: Number(d.buy) || 0,
           color: '#22c55e'
         }))
         buySeriesRef.current.setData(buyData)
@@ -111,7 +113,7 @@ export default function MarketFlowIndicators({
       if (sellSeriesRef.current && data.length > 0) {
         const sellData = data.map(d => ({
           time: d.time,
-          value: -(d.sell || 0),
+          value: -(Number(d.sell) || 0),
           color: '#ef4444'
         }))
         sellSeriesRef.current.setData(sellData)
@@ -125,8 +127,8 @@ export default function MarketFlowIndicators({
           // Histogram with colors based on value
           const histData = data.map(d => ({
             time: d.time,
-            value: d.value || 0,
-            color: (d.value || 0) >= 0 ? colors.up : colors.down
+            value: Number(d.value) || 0,
+            color: (Number(d.value) || 0) >= 0 ? colors.up : colors.down
           }))
           seriesRef.current.setData(histData)
         } else {
@@ -245,10 +247,10 @@ export default function MarketFlowIndicators({
     }
   }, [selectedIndicator])
 
-  // Fetch data when symbol or timeframe changes
+  // Fetch data when symbol, timeframe, or exchange changes
   useEffect(() => {
     fetchIndicatorData()
-  }, [symbol, timeframe])
+  }, [symbol, timeframe, exchange])
 
   if (!selectedIndicator) return null
 

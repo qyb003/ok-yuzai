@@ -217,26 +217,39 @@ def get_ticker_data(symbol: str, market: str = "CRYPTO", environment: str = "mai
             # 导入 OKX 统一适配器（与 BinanceAdapter 架构一致）
             from services.exchanges.okx_adapter import OkxAdapter
             adapter = OkxAdapter(environment=environment)
-            
-            # 第一步：获取 OKX 24小时行情数据（最新价、涨跌幅、成交量等）
+
+            # 第一步：获取 OKX 24小时行情数据（最新价、24h 开盘价、成交额等）
+            # fetch_ticker 返回 OKX 原始 dict（字段名: last/open24h/volCcy24h/ts）
             ticker = adapter.fetch_ticker(symbol)
-            
+
+            # 提取原始数值并做安全转换（OKX 所有数值字段均为字符串）
+            last_price = float(ticker.get('last', 0) or 0)
+            open24h = float(ticker.get('open24h', 0) or 0)
+            vol_ccy_24h = float(ticker.get('volCcy24h', 0) or 0)
+
+            # OKX V5 不直接返回涨跌额/涨跌幅，需基于 last 与 open24h 手动计算
+            change24h = (last_price - open24h) if open24h > 0 else 0.0
+            percentage24h = ((last_price - open24h) / open24h * 100) if open24h > 0 else 0.0
+
             # 第二步：获取 OKX 永续合约持仓量（Open Interest）
+            # fetch_open_interest 返回 UnifiedOpenInterest dataclass（字段: open_interest）
             oi_data = adapter.fetch_open_interest(symbol)
-            
+
             # 第三步：获取 OKX 资金费率
+            # fetch_funding_rate 返回 UnifiedFunding dataclass（字段: funding_rate）
             funding_data = adapter.fetch_funding_rate(symbol)
-            
+
             # 统一返回格式（与 Binance 字段完全一致，确保前后端兼容）
+            # 注意：dataclass 使用属性访问，不能用 .get()；字段名为统一后的 funding_rate/open_interest
             return {
-                'symbol': symbol,                           # 交易对符号
-                'price': float(ticker.get('last', 0)),      # 最新成交价
-                'oracle_price': float(ticker.get('last', 0)), # 预言机价格（OKX无，用最新价替代）
-                'change24h': float(ticker.get('change24h', 0)),  # 24h价格变动绝对值
-                'volume24h': float(ticker.get('volCcy24h', 0)),  # 24h成交额(USD)
-                'percentage24h': float(ticker.get('change24hPct', 0)),  # 24h涨跌幅(%)
-                'open_interest': float(oi_data.get('oi', 0)) * float(ticker.get('last', 0)) if oi_data else 0,  # 持仓金额(USD)
-                'funding_rate': float(funding_data.get('fundingRate', 0)) if funding_data else 0,  # 当前资金费率
+                'symbol': symbol,
+                'price': last_price,
+                'oracle_price': last_price,  # OKX 无预言机价格，用最新价替代
+                'change24h': change24h,
+                'volume24h': vol_ccy_24h,
+                'percentage24h': percentage24h,
+                'open_interest': float(oi_data.open_interest) * last_price if oi_data else 0,  # 持仓金额(USD)
+                'funding_rate': float(funding_data.funding_rate) if funding_data else 0,  # 当前资金费率
             }
         except Exception as e:
             logger.error(f"OKX 行情数据获取失败 ({environment}): {e}")

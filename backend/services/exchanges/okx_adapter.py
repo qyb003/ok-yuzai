@@ -63,6 +63,34 @@ class OkxAdapter(BaseExchangeAdapter):
 
     # ==================== 数据获取 ====================
 
+    def fetch_ticker(self, symbol: str) -> dict:
+        """获取 24h 行情快照（最新价、24h 开盘价、24h 成交额等）。
+
+        返回原始 dict（与 BinanceAdapter._request("/fapi/v1/ticker/24hr") 模式一致），
+        供 services/market_data.py 统一字段提取，避免 dataclass/dict 不一致问题。
+
+        OKX V5 /api/v5/market/ticker 返回字段（节选）：
+          last       最新成交价
+          open24h    24h 开盘价
+          high24h    24h 最高价
+          low24h     24h 最低价
+          vol24h     24h 成交量（base currency）
+          volCcy24h  24h 成交额（quote currency，USDT）
+          ts         数据时间戳（毫秒）
+        """
+        inst_id = self._to_exchange_symbol(symbol)
+        params = {"instId": inst_id}
+        resp = self._get_with_retry(
+            f"{self.BASE_URL}/api/v5/market/ticker",
+            params=params, timeout=10
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+        if not data:
+            raise ValueError(f"OKX 未返回 {symbol} ticker 数据")
+        # 返回第一条原始 dict，字段名保持 OKX 原样
+        return data[0]
+
     def fetch_klines(
         self, symbol: str, interval: str, limit: int = 100,
         start_time: Optional[int] = None, end_time: Optional[int] = None,

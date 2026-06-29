@@ -1025,6 +1025,7 @@ export default function ProgramTrader() {
                   <SelectContent>
                     <SelectItem value="hyperliquid">{t('programTrader.exchangeHyperliquid')}</SelectItem>
                     <SelectItem value="binance">{t('programTrader.exchangeBinance')}</SelectItem>
+                    <SelectItem value="okx">{t('programTrader.exchangeOkx', 'OKX')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">{t('programTrader.exchangeHint')}</p>

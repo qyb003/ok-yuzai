@@ -219,13 +219,13 @@ export default function AIAnalysisPanel({
       }))
 
       const marketDataPayload = {
-        price: marketData?.price || 0,
-        oracle_price: marketData?.oracle_price || 0,
-        change24h: marketData?.change24h || 0,
-        volume24h: marketData?.volume24h || 0,
-        percentage24h: marketData?.percentage24h || 0,
-        open_interest: marketData?.open_interest || 0,
-        funding_rate: marketData?.funding_rate || 0
+        price: Number(marketData?.price) || 0,
+        oracle_price: Number(marketData?.oracle_price) || 0,
+        change24h: Number(marketData?.change24h) || 0,
+        volume24h: Number(marketData?.volume24h) || 0,
+        percentage24h: Number(marketData?.percentage24h) || 0,
+        open_interest: Number(marketData?.open_interest) || 0,
+        funding_rate: Number(marketData?.funding_rate) || 0
       }
 
       const requestData = {
@@ -239,7 +239,7 @@ export default function AIAnalysisPanel({
           high: k.high,
           low: k.low,
           close: k.close,
-          volume: k.volume || 0
+          volume: Number(k.volume) || 0
         })),
         indicators: {
           // 直接携带现有指标

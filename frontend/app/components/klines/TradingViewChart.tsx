@@ -35,7 +35,7 @@ function getMarkerParticleColor(marker: { tone?: 'bullish' | 'bearish' | 'mixed'
 interface TradingViewChartProps {
   symbol: string
   period: string
-  exchange?: 'hyperliquid' | 'binance'
+  exchange?: 'hyperliquid' | 'binance' | 'okx'  // [OKX 修复] 补全 okx 联合类型
   chartType: 'candlestick' | 'line' | 'area'
   selectedIndicators: string[]
   selectedFlowIndicators?: string[]
@@ -948,7 +948,7 @@ export default function TradingViewChart({
           const mainData = convertDataForSeries(currentChartData, chartType)
           const volumeData = currentChartData.map(item => ({
             time: item.time,
-            value: item.volume || 0,
+            value: Number(item.volume) || 0,
             color: item.close >= item.open ? '#22c55e' : '#ef4444',
           }))
 
@@ -1226,7 +1226,7 @@ export default function TradingViewChart({
       // 成交量数据
       const volumeData = chartData.map(item => ({
         time: item.time,
-        value: item.volume || 0,
+        value: Number(item.volume) || 0,
         color: item.close >= item.open ? '#22c55e' : '#ef4444',
       }))
 
@@ -1575,7 +1575,7 @@ export default function TradingViewChart({
       if (flowTakerBuySeriesRef.current) {
         const buyData = data.map(d => ({
           time: formatChartTime(d.time),
-          value: d.buy || 0,
+          value: Number(d.buy) || 0,
           color: colors.up
         }))
         flowTakerBuySeriesRef.current.setData(buyData)
@@ -1583,7 +1583,7 @@ export default function TradingViewChart({
       if (flowTakerSellSeriesRef.current) {
         const sellData = data.map(d => ({
           time: formatChartTime(d.time),
-          value: -(d.sell || 0),
+          value: -(Number(d.sell) || 0),
           color: colors.down
         }))
         flowTakerSellSeriesRef.current.setData(sellData)
@@ -1594,15 +1594,15 @@ export default function TradingViewChart({
         if (['oi_delta', 'order_imbalance'].includes(indicator)) {
           const histData = data.map(d => ({
             time: formatChartTime(d.time),
-            value: d.value || 0,
-            color: (d.value || 0) >= 0 ? colors.up : colors.down
+            value: Number(d.value) || 0,
+            color: (Number(d.value) || 0) >= 0 ? colors.up : colors.down
           }))
           seriesRef.current.setData(histData)
         } else if (indicator === 'depth_ratio') {
           // Use log scale for depth_ratio to handle extreme values
           const lineData = data.map(d => ({
             time: formatChartTime(d.time),
-            value: d.value > 0 ? Math.log10(d.value) : 0
+            value: Number(d.value) > 0 ? Math.log10(Number(d.value)) : 0
           }))
           seriesRef.current.setData(lineData)
         } else if (indicator === 'funding') {
@@ -1610,13 +1610,13 @@ export default function TradingViewChart({
           // e.g., 0.000292% becomes 2.92 bps
           const lineData = data.map(d => ({
             time: formatChartTime(d.time),
-            value: (d.value || 0) * 10000
+            value: (Number(d.value) || 0) * 10000
           }))
           seriesRef.current.setData(lineData)
         } else {
           const lineData = data.map(d => ({
             time: formatChartTime(d.time),
-            value: d.value
+            value: Number(d.value) || 0
           }))
           seriesRef.current.setData(lineData)
         }
@@ -1677,11 +1677,11 @@ export default function TradingViewChart({
       if (result.klines && result.klines.length > 0) {
         const newChartData = result.klines.map((item: any) => ({
           time: formatChartTime(item.timestamp),
-          open: item.open || 0,
-          high: item.high || 0,
-          low: item.low || 0,
-          close: item.close || 0,
-          volume: item.volume || 0,
+          open: Number(item.open) || 0,
+          high: Number(item.high) || 0,
+          low: Number(item.low) || 0,
+          close: Number(item.close) || 0,
+          volume: Number(item.volume) || 0,
         }))
 
         const mergedChartData = !incremental || chartData.length === 0

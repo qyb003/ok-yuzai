@@ -102,13 +102,13 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
         const data = await response.json()
         const formattedData = data.map((item: any) => ({
           symbol: item.symbol,
-          price: item.price || 0,
-          oracle_price: item.oracle_price || 0,
-          change24h: item.change24h || 0,
-          volume24h: item.volume24h || 0,
-          percentage24h: item.percentage24h || 0,
-          open_interest: item.open_interest || 0,
-          funding_rate: item.funding_rate || 0
+          price: Number(item.price) || 0,
+          oracle_price: Number(item.oracle_price) || 0,
+          change24h: Number(item.change24h) || 0,
+          volume24h: Number(item.volume24h) || 0,
+          percentage24h: Number(item.percentage24h) || 0,
+          open_interest: Number(item.open_interest) || 0,
+          funding_rate: Number(item.funding_rate) || 0
         }))
         setMarketData(formattedData)
       } catch (error) {
@@ -143,7 +143,7 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
       const endpoint = selectedExchange === 'hyperliquid'
         ? '/api/hyperliquid/symbols/watchlist'
         : selectedExchange === 'okx'
-          ? '/api/binance/symbols/watchlist'
+          ? '/api/okx/symbols/watchlist'
           : '/api/binance/symbols/watchlist'
       const response = await fetch(endpoint)
       const data = await response.json()
