@@ -52,7 +52,8 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
     }
     const minutes = periodMinutes[period] || 1
 
-    if (exchange === 'binance' || exchange === 'okx') {
+    if (exchange === 'binance') {
+      // Binance K-line API 包含 taker buy/sell volume 数据
       return {
         cvd: true,
         taker_volume: true,
@@ -60,6 +61,19 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
         oi: minutes >= 5,
         oi_delta: minutes >= 5,
         // Funding: Now collected every minute via premiumIndex API
+        funding: true,
+        depth_ratio: true,
+        order_imbalance: true
+      }
+    }
+    if (exchange === 'okx') {
+      // Bug #4 修复：OKX K-line API 不提供 taker buy/sell volume 数据
+      // 禁用 CVD 和 taker_volume 指标，避免前端显示空白
+      return {
+        cvd: false,
+        taker_volume: false,
+        oi: minutes >= 5,
+        oi_delta: minutes >= 5,
         funding: true,
         depth_ratio: true,
         order_imbalance: true
@@ -323,7 +337,7 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
                     {selectedExchange === 'hyperliquid'
                       ? t('kline.mainnetWarning', 'K-line analysis is only available for Mainnet environment')
                       : selectedExchange === 'okx'
-                        ? t('kline.binanceWarning', 'K-line analysis is only available for Binance Futures production environment')
+                        ? t('kline.okxWarning', 'K-line analysis is only available for OKX Futures production environment')
                         : t('kline.binanceWarning', 'K-line analysis is only available for Binance Futures production environment')
                     }
                   </span>
@@ -333,7 +347,7 @@ export default function KlinesView({ onAccountUpdated }: KlinesViewProps) {
                     {selectedExchange === 'hyperliquid'
                       ? t('common.collectionDaysHint', 'Hyperliquid market flow data collected for {{days}} days', { days: collectionDays })
                       : selectedExchange === 'okx'
-                        ? t('common.binanceCollectionDaysHint', 'Binance market flow data collected for {{days}} days', { days: collectionDays })
+                        ? t('common.okxCollectionDaysHint', 'OKX market flow data collected for {{days}} days', { days: collectionDays })
                         : t('common.binanceCollectionDaysHint', 'Binance market flow data collected for {{days}} days', { days: collectionDays })
                     }
                   </p>

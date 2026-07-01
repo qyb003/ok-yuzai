@@ -103,6 +103,11 @@ class OkxCollector:
                         klines = self.adapter.fetch_klines(symbol, period, limit=5)
                         if klines:
                             persistence.save_klines(klines)
+                            # Bug #10 修复：与 BinanceCollector 保持一致，
+                            # 调用 save_taker_volumes_from_klines 将 taker 数据存入 MarketTradesAggregated
+                            # 注意：OKX K-line API 不提供 taker 数据，此调用为 no-op，
+                            # 但保留调用以确保未来添加 taker 数据源时不会遗漏
+                            persistence.save_taker_volumes_from_klines(klines)
                     except Exception as e:
                         logger.error(f"[OKX] Kline {symbol}/{period}: {e}")
         finally:

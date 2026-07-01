@@ -66,6 +66,7 @@ class SymbolMapper:
             "ETHUSDT": "ETH",
         },
         # [OKX] OKX instId -> 内部符号反向映射
+        # Bug #8 修复：补全所有 SPECIAL_MAPPINGS["okx"] 对应的反向映射
         "okx": {
             "BTC-USDT-SWAP": "BTC",
             "ETH-USDT-SWAP": "ETH",
@@ -75,6 +76,18 @@ class SymbolMapper:
             "ADA-USDT-SWAP": "ADA",
             "AVAX-USDT-SWAP": "AVAX",
             "LINK-USDT-SWAP": "LINK",
+            "DOT-USDT-SWAP": "DOT",
+            "LTC-USDT-SWAP": "LTC",
+            "BCH-USDT-SWAP": "BCH",
+            "SUI-USDT-SWAP": "SUI",
+            "TRX-USDT-SWAP": "TRX",
+            "APT-USDT-SWAP": "APT",
+            "ARB-USDT-SWAP": "ARB",
+            "OP-USDT-SWAP": "OP",
+            "NEAR-USDT-SWAP": "NEAR",
+            "ATOM-USDT-SWAP": "ATOM",
+            "FIL-USDT-SWAP": "FIL",
+            "UNI-USDT-SWAP": "UNI",
         },
     }
 

@@ -24,6 +24,12 @@ from .base_adapter import (
 )
 from .symbol_mapper import SymbolMapper
 
+# OKX V5 /market/candles 返回字段索引
+# [0]ts  [1]o  [2]h  [3]l  [4]c  [5]vol(张)  [6]volCcy(币)  [7]volCcyQuote(USDT)
+# 对于 SWAP：index 5 = 合约张数, index 6 = 基础币种, index 7 = 计价币种(USDT)
+_OKX_KLINE_VOL_CCY = 6       # 基础币种成交量
+_OKX_KLINE_VOL_CCY_QUOTE = 7  # 计价币种(USDT)成交量
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +66,21 @@ class OkxAdapter(BaseExchangeAdapter):
                     _time.sleep(1.5)
                     logger.warning(f"[OKX] HTTP retry {retry+1}/{max_retries}: {e}")
         raise last_err
+
+    # ==================== Price Methods ====================
+
+    def fetch_price(self, symbol: str) -> float:
+        """获取最新成交价（Bug #1 修复：补全 fetch_price 方法）。
+
+        通过 OKX V5 /api/v5/market/ticker 获取最新成交价。
+        与 BinanceAdapter.fetch_price() 返回类型一致（float）。
+        """
+        ticker = self.fetch_ticker(symbol)
+        price = float(ticker.get("last", 0) or 0)
+        if price <= 0:
+            inst_id = self._to_exchange_symbol(symbol)
+            raise ValueError(f"OKX returned invalid price for {inst_id}: {price}")
+        return price
 
     # ==================== 数据获取 ====================
 
@@ -103,10 +124,14 @@ class OkxAdapter(BaseExchangeAdapter):
         bar = bar_map.get(interval, interval)
 
         params = {"instId": inst_id, "bar": bar, "limit": str(min(limit, 300))}
+        # Bug #2 修复：OKX V5 before/after 语义
+        #   before = 返回早于此时间戳的记录（结束时间）
+        #   after  = 返回晚于此时间戳的记录（开始时间）
+        # 原代码将 start_time→before, end_time→after 映射反了，导致范围查询返回空集
         if start_time:
-            params["before"] = str(start_time)
+            params["after"] = str(start_time)
         if end_time:
-            params["after"] = str(end_time)
+            params["before"] = str(end_time)
 
         resp = self._get_with_retry(
             f"{self.BASE_URL}/api/v5/market/candles",
@@ -118,6 +143,12 @@ class OkxAdapter(BaseExchangeAdapter):
         klines = []
         for item in reversed(data):  # OKX 返回最新在前，需反转
             ts_ms = int(item[0])
+            # Bug #3 修复：OKX V5 /market/candles 字段映射
+            #   index 5 = vol (合约张数, SWAP)
+            #   index 6 = volCcy (基础币种, e.g. BTC)
+            #   index 7 = volCcyQuote (计价币种, e.g. USDT)
+            # 原代码 volume=item[5](张数), quote_volume=item[6](币种) 语义错误
+            # UnifiedKline.volume = 基础币种成交量, quote_volume = USDT 计价成交量
             klines.append(UnifiedKline(
                 exchange="okx", symbol=symbol, interval=interval,
                 timestamp=ts_ms // 1000,
@@ -125,8 +156,10 @@ class OkxAdapter(BaseExchangeAdapter):
                 high_price=Decimal(str(item[2])),
                 low_price=Decimal(str(item[3])),
                 close_price=Decimal(str(item[4])),
-                volume=Decimal(str(item[5])),
-                quote_volume=Decimal(str(item[6])),
+                volume=Decimal(str(item[_OKX_KLINE_VOL_CCY])),          # volCcy: 基础币种
+                quote_volume=Decimal(str(item[_OKX_KLINE_VOL_CCY_QUOTE])),  # volCcyQuote: USDT
+                # OKX K-line API 不提供 taker 买卖量数据（与 Binance 不同）
+                # taker_buy_volume / taker_sell_volume 保持 None
             ))
         return klines
 
@@ -171,15 +204,43 @@ class OkxAdapter(BaseExchangeAdapter):
             raise ValueError(f"OKX 未返回 {symbol} 资金费率")
 
         item = data[0]
+
+        # Bug #7 修复：获取 mark_price
+        # OKX V5 /api/v5/public/mark-price 返回标记价格
+        mark_price = None
+        try:
+            mp_resp = self._get_with_retry(
+                f"{self.BASE_URL}/api/v5/public/mark-price",
+                params={"instId": inst_id}, timeout=10
+            )
+            mp_resp.raise_for_status()
+            mp_data = mp_resp.json().get("data", [])
+            if mp_data:
+                mark_price = Decimal(str(mp_data[0].get("markPx", 0)))
+        except Exception as e:
+            logger.warning(f"[OKX] Failed to fetch mark price for {symbol}: {e}")
+
         return UnifiedFunding(
             exchange="okx", symbol=symbol,
             timestamp=int(item.get("fundingTime", 0)),
             funding_rate=Decimal(str(item.get("fundingRate", 0))),
             next_funding_time=int(item.get("nextFundingTime", 0)),
+            mark_price=mark_price,
         )
 
     def fetch_open_interest(self, symbol: str) -> UnifiedOpenInterest:
-        """获取当前持仓量。"""
+        """获取当前持仓量。
+
+        Bug #5/#6 修复：OKX OI 字段语义
+          oi    = 合约张数 (contracts)
+          oiCcy = 基础币种持仓量 (e.g. BTC)
+
+        UnifiedOpenInterest 约定（与 Binance 一致）：
+          open_interest       = 基础币种持仓量
+          open_interest_value = 计价币种(USD)持仓量 = oiCcy * mark_price
+
+        原代码 open_interest=oi(张数) 导致下游 market_data.py 计算 USD 值时错误。
+        """
         inst_id = self._to_exchange_symbol(symbol)
         params = {"instId": inst_id}
         resp = self._get_with_retry(f"{self.BASE_URL}/api/v5/public/open-interest", params=params, timeout=10)
@@ -189,10 +250,18 @@ class OkxAdapter(BaseExchangeAdapter):
             raise ValueError(f"OKX 未返回 {symbol} 持仓量")
 
         item = data[0]
-        oi = Decimal(str(item.get("oi", 0)))
-        oi_value = Decimal(str(item.get("oiCcy", 0))) if item.get("oiCcy") else None
+        # 优先使用 oiCcy（基础币种），与 Binance 的 openInterest 语义一致
+        oi_ccy = item.get("oiCcy")
+        if oi_ccy:
+            open_interest = Decimal(str(oi_ccy))  # 基础币种
+        else:
+            # 回退到 oi（张数），下游需注意这是张数而非币种
+            open_interest = Decimal(str(item.get("oi", 0)))
+            logger.warning(f"[OKX] oiCcy missing for {symbol}, falling back to oi (contracts)")
+
         return UnifiedOpenInterest(
             exchange="okx", symbol=symbol,
             timestamp=int(item.get("ts", int(datetime.utcnow().timestamp() * 1000))),
-            open_interest=oi, open_interest_value=oi_value,
+            open_interest=open_interest,
+            open_interest_value=None,  # USD 价值由下游 (market_data.py) 用 price * open_interest 计算
         )

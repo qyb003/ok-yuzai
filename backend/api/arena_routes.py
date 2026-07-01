@@ -722,11 +722,12 @@ def get_completed_trades(
             pools = db.query(SignalPool).filter(SignalPool.id.in_(program_log_signal_pool_ids)).all()
             signal_pool_map = {p.id: p.pool_name for p in pools}
 
-        # For Binance: build mapping from triggered order ID to main order ID
+        # For Binance/OKX: build mapping from triggered order ID to main order ID
         # Binance TP/SL orders have two IDs:
         # 1. Algo Order ID (stored in sl_order_id/tp_order_id) - e.g., 1000000012523017
         # 2. Triggered Order ID (in HyperliquidTrade) - e.g., 12165552060
         # We need to map triggered order IDs to main order IDs for proper nesting
+        # [OKX] OKX 的 algo order 触发后也会产生新订单 ID，需要同样的映射
         binance_triggered_sl_to_main = {}  # triggered_order_id -> main_order_id
         binance_triggered_tp_to_main = {}  # triggered_order_id -> main_order_id
 
@@ -754,6 +755,26 @@ def get_completed_trades(
                                 binance_triggered_tp_to_main[triggered_oid] = main_order_id
                 except Exception as e:
                     logger.warning(f"Failed to get Binance fills for TP/SL mapping: {e}")
+
+        # [OKX 修复] Get OKX wallets to fetch TP/SL order mapping
+        okx_wallets = db.query(OkxWallet).filter(OkxWallet.is_active == "true").all()
+        if okx_wallets:
+            from services.okx_environment import get_okx_client
+            for wallet in okx_wallets:
+                try:
+                    client = get_okx_client(db, wallet.account_id, override_environment=wallet.environment)
+                    fills = client.get_user_fills(limit=100)
+                    for fill in fills:
+                        main_order_id = fill.get("main_order_id")
+                        if main_order_id:
+                            triggered_oid = fill.get("oid")
+                            order_type = fill.get("order_type")
+                            if order_type == "sl":
+                                binance_triggered_sl_to_main[triggered_oid] = main_order_id
+                            elif order_type == "tp":
+                                binance_triggered_tp_to_main[triggered_oid] = main_order_id
+                except Exception as e:
+                    logger.warning(f"[OKX] Failed to get fills for TP/SL mapping: {e}")
 
         # First pass: build trade objects and separate main orders from sl/tp orders
         main_trades: Dict[str, dict] = {}  # order_id -> trade dict
@@ -1623,10 +1644,60 @@ def update_pnl_data(db: Session = Depends(get_db)):
     finally:
         snapshot_db.close()
 
-    # [OKX 新增] OKX 钱包 PnL 数据同步（占位，数据采集器负责实际数据入库）
-    # OKX 的成交数据由 okx_collector 采集后存入数据库，
-    # PnL 同步通过 okx_snapshot_service 定期获取账户快照实现。
-    # 此处仅标记 OKX 已被纳入 PnL 更新流程。
+    # ========== Process OKX wallets ==========
+    # [OKX 修复] 替换占位注释，实现与 Binance 一致的 PnL 同步流程
+    try:
+        snapshot_db_okx = SnapshotSessionLocal()
+        okx_wallets = db.query(OkxWallet).filter(OkxWallet.is_active == "true").all()
+        if okx_wallets:
+            from services.okx_trading_client import OkxTradingClient
+            from utils.encryption import decrypt_private_key
+            from services.okx_environment import get_okx_client
+
+            okx_wallet_configs = {}
+            for w in okx_wallets:
+                key = (w.account_id, w.environment)
+                if key not in okx_wallet_configs:
+                    okx_wallet_configs[key] = w
+
+            all_okx_fills_by_env = defaultdict(list)
+            for (account_id, environment), wallet in okx_wallet_configs.items():
+                try:
+                    # OkxTradingClient 通过 get_okx_client 获取，内部处理了密钥解密
+                    client = get_okx_client(db, wallet.account_id, override_environment=environment)
+                    fills = client.get_user_fills(limit=100)
+                    all_okx_fills_by_env[environment].extend(fills)
+                    logger.info(f"[OKX] Fetched {len(fills)} fills for account {account_id} on {environment}")
+                except Exception as e:
+                    error_msg = f"[OKX] Failed to fetch fills for account {account_id} on {environment}: {str(e)}"
+                    logger.warning(error_msg)
+                    result["errors"].append(error_msg)
+
+            result["okx"] = {}
+            for environment, fills in all_okx_fills_by_env.items():
+                env_result = _process_fills_for_environment(
+                    db, snapshot_db_okx, environment, fills, okx_wallet_configs, exchange="okx"
+                )
+                result["okx"][environment] = env_result
+
+            snapshot_db_okx.commit()
+            db.commit()
+        else:
+            logger.info("[OKX] No active OKX wallets found, skipping PnL sync")
+    except Exception as e:
+        logger.error(f"[OKX] Error updating PnL data: {e}", exc_info=True)
+        result["success"] = False
+        result["errors"].append(f"OKX: {str(e)}")
+        try:
+            snapshot_db_okx.rollback()
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            snapshot_db_okx.close()
+        except Exception:
+            pass
 
     return result
 
@@ -1696,6 +1767,14 @@ def _process_fills_for_environment(
         if exchange == "binance" and fill.get("main_order_id"):
             binance_tpsl_to_main[oid] = fill.get("main_order_id")
 
+        # [OKX 修复] OKX TP/SL: OKX 的止盈止损通过 algo order 实现
+        # get_user_fills 已将 OKX 的 side 映射为 "B"/"A"，fillPnl 映射为 closedPnl
+        # OKX 的 fill 没有 main_order_id 字段，TP/SL 关联通过 algoId 查询
+        # 当前 okx_trading_client.get_user_fills() 返回的 main_order_id 为 None
+        # 如果未来 OkxTradingClient 填充了 main_order_id，此处自动适配
+        if exchange == "okx" and fill.get("main_order_id"):
+            binance_tpsl_to_main[oid] = fill.get("main_order_id")  # 复用同一映射表
+
     result["unique_orders"] = len(order_aggregates)
 
     # Update HyperliquidTrade records
@@ -1751,7 +1830,8 @@ def _process_fills_for_environment(
 
     # For Binance: also map triggered order IDs to their decisions
     # Binance TP/SL triggered orders have different IDs than the algo order IDs stored in decision
-    if exchange == "binance":
+    # [OKX] OKX 复用同一逻辑：如果 fill 有 main_order_id，也建立映射
+    if exchange in ("binance", "okx"):
         for triggered_oid, main_oid in binance_tpsl_to_main.items():
             # Find the decision that has this main_order_id
             decision = order_to_decision.get(main_oid)
@@ -1771,22 +1851,22 @@ def _process_fills_for_environment(
             if oid:
                 order_to_program_log[str(oid)] = pl
 
-    # For Binance: also map triggered order IDs to their program logs
-    if exchange == "binance":
+    # For Binance/OKX: also map triggered order IDs to their program logs
+    if exchange in ("binance", "okx"):
         for triggered_oid, main_oid in binance_tpsl_to_main.items():
             pl = order_to_program_log.get(main_oid)
             if pl and triggered_oid not in order_to_program_log:
                 order_to_program_log[triggered_oid] = pl
 
     # Create missing HyperliquidTrade records for resting orders that later filled
-    # For Binance: also update existing records with official fill data
+    # For Binance/OKX: also update existing records with official fill data
     # Check both AIDecisionLog and ProgramExecutionLog
     for oid, agg in order_aggregates.items():
-        existing_trade = existing_trades_by_order_id.get(oid) if exchange == "binance" else None
+        existing_trade = existing_trades_by_order_id.get(oid) if exchange in ("binance", "okx") else None
 
         # For Hyperliquid: skip if already exists
-        # For Binance: allow update of existing records
-        if oid in existing_trade_order_ids and exchange != "binance":
+        # For Binance/OKX: allow update of existing records
+        if oid in existing_trade_order_ids and exchange not in ("binance", "okx"):
             continue  # Already exists (Hyperliquid only)
 
         # Try to find source: AIDecisionLog or ProgramExecutionLog
@@ -1852,8 +1932,8 @@ def _process_fills_for_environment(
             symbol = program_log.decision_symbol or fills_list[0].get("coin", "")
             source_info = f"program_log {program_log.id}"
 
-        # For Binance: update existing record with official fill data
-        if existing_trade and exchange == "binance":
+        # For Binance/OKX: update existing record with official fill data
+        if existing_trade and exchange in ("binance", "okx"):
             existing_trade.quantity = total_qty
             existing_trade.price = avg_price
             existing_trade.trade_value = total_value
@@ -1906,9 +1986,9 @@ def _process_fills_for_environment(
                     total_pnl += agg["total_pnl"]
                     matched_order_ids.add(order_id_str)
 
-        # For Binance: also check TP/SL orders that triggered and created new order IDs
+        # For Binance/OKX: also check TP/SL orders that triggered and created new order IDs
         # The triggered order's clientOrderId contains the main order ID (e.g., "SL_12345")
-        if exchange == "binance" and decision.hyperliquid_order_id:
+        if exchange in ("binance", "okx") and decision.hyperliquid_order_id:
             main_oid = str(decision.hyperliquid_order_id)
             for tpsl_oid, linked_main_oid in binance_tpsl_to_main.items():
                 if linked_main_oid == main_oid and tpsl_oid not in matched_order_ids:
@@ -1989,8 +2069,8 @@ def _process_fills_for_environment(
                     total_pnl += agg["total_pnl"]
                     matched_order_ids.add(order_id_str)
 
-        # For Binance: also check TP/SL orders that triggered and created new order IDs
-        if exchange == "binance" and program_log.hyperliquid_order_id:
+        # For Binance/OKX: also check TP/SL orders that triggered and created new order IDs
+        if exchange in ("binance", "okx") and program_log.hyperliquid_order_id:
             main_oid = str(program_log.hyperliquid_order_id)
             for tpsl_oid, linked_main_oid in binance_tpsl_to_main.items():
                 if linked_main_oid == main_oid and tpsl_oid not in matched_order_ids:
